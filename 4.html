@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- FIX 1: Strict viewport to prevent layout breaking and zooming -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>AetherSync // P2P Portal</title>
     
-    <!-- Lightweight WebRTC Library -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     
     <style>
@@ -19,11 +19,11 @@
             --success: #10b981;
             --text-main: #f8fafc;
             --text-dim: #94a3b8;
-            --radius: 16px;
+            --radius: 12px;
             --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
         body {
             font-family: var(--font);
@@ -32,12 +32,12 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
         }
 
-        /* Top Navigation */
         header {
-            padding: 20px;
-            background: rgba(24, 24, 27, 0.8);
+            padding: 15px 20px;
+            background: rgba(24, 24, 27, 0.95);
             backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border);
             text-align: center;
@@ -46,59 +46,51 @@
             z-index: 100;
         }
 
-        h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; }
+        h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.5px; }
         h1 span { color: var(--primary); }
 
-        /* Main Layout Grid */
         .app-container {
             flex: 1;
-            padding: 20px;
+            padding: 15px;
             display: grid;
-            gap: 20px;
+            gap: 15px;
             max-width: 1200px;
             margin: 0 auto;
             width: 100%;
         }
 
-        /* Desktop Layout */
         @media (min-width: 800px) {
-            .app-container {
-                grid-template-columns: 350px 1fr;
-                align-items: start;
-                padding: 40px 20px;
-            }
+            .app-container { grid-template-columns: 320px 1fr; align-items: start; padding: 30px 20px; gap: 25px; }
         }
 
-        /* Cards */
         .card {
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 24px;
+            padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            gap: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
 
         .card-title {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: var(--text-dim);
             text-transform: uppercase;
             letter-spacing: 1px;
             font-weight: 700;
         }
 
-        /* Connection Section */
         .id-display {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             font-weight: 900;
             text-align: center;
             color: var(--primary);
             letter-spacing: 2px;
             background: #000;
-            padding: 15px;
-            border-radius: 12px;
+            padding: 12px;
+            border-radius: 8px;
             border: 1px dashed var(--border);
             user-select: all;
         }
@@ -111,14 +103,15 @@
             overflow: hidden;
         }
 
-        .link-box input {
+        /* FIX 2: Force font-size to 16px to stop iOS Safari from zooming in */
+        input[type="text"] {
             flex: 1;
             background: transparent;
             border: none;
-            color: var(--text-dim);
+            color: var(--text-main);
             padding: 12px;
             font-family: monospace;
-            font-size: 0.85rem;
+            font-size: 16px !important; 
             outline: none;
         }
 
@@ -126,8 +119,8 @@
             background: var(--primary);
             color: #fff;
             border: none;
-            padding: 14px 20px;
-            font-size: 0.95rem;
+            padding: 14px 16px;
+            font-size: 16px !important; /* Touch friendly */
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -139,21 +132,13 @@
             gap: 8px;
         }
 
-        .btn:hover:not(:disabled) {
-            filter: brightness(1.1);
-            box-shadow: 0 0 15px var(--primary-glow);
-        }
-
+        .btn:hover:not(:disabled) { filter: brightness(1.1); box-shadow: 0 0 15px var(--primary-glow); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        .btn-outline {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-main);
-        }
+        .btn:active { transform: scale(0.98); }
+
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
         .btn-outline:hover { background: var(--surface-hover); }
 
-        /* File Dropzone / Portal */
         .portal {
             position: relative;
             border: 2px dashed var(--border);
@@ -162,77 +147,60 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 40px 20px;
+            padding: 30px 15px;
             text-align: center;
             background: rgba(0,0,0,0.2);
             transition: all 0.2s;
-            min-height: 250px;
+            min-height: 200px;
+            cursor: pointer;
         }
 
-        .portal.active {
-            border-color: var(--primary);
-            background: rgba(59, 130, 246, 0.05);
-        }
+        .portal.active { border-color: var(--primary); background: rgba(59, 130, 246, 0.05); }
+        .portal.dragover { border-color: var(--success); background: rgba(16, 185, 129, 0.1); transform: scale(1.02); }
 
-        .portal.dragover {
-            border-color: var(--success);
-            background: rgba(16, 185, 129, 0.1);
-            transform: scale(1.02);
-        }
-
-        .portal-icon { font-size: 3rem; margin-bottom: 10px; opacity: 0.8; }
+        .portal-icon { font-size: 2.5rem; margin-bottom: 10px; opacity: 0.8; }
         .portal-text { font-size: 1.1rem; font-weight: 600; }
         .portal-sub { font-size: 0.85rem; color: var(--text-dim); margin-top: 5px; }
 
         input[type="file"] { display: none; }
 
-        /* Transfer Log */
         .transfer-log {
             flex: 1;
             background: #000;
             border-radius: var(--radius);
             border: 1px solid var(--border);
-            padding: 16px;
+            padding: 12px;
             overflow-y: auto;
-            max-height: 300px;
+            max-height: 350px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         .log-item {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
             padding: 12px;
             background: var(--surface);
             border-radius: 8px;
             font-size: 0.85rem;
             animation: slideIn 0.3s ease;
+            border: 1px solid var(--border);
         }
 
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .log-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
-        .log-size { color: var(--text-dim); }
-        .badge-out { color: var(--primary); font-weight: bold; }
-        .badge-in { color: var(--success); font-weight: bold; }
-
-        .hidden { display: none !important; }
+        .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .log-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%; }
+        .badge-out { color: var(--primary); font-weight: bold; font-size: 0.75rem;}
+        .badge-in { color: var(--success); font-weight: bold; font-size: 0.75rem;}
         
-        /* Loading Spinner */
-        .spinner {
-            width: 20px; height: 20px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        /* Mobile Progress Bar */
+        .progress-container { width: 100%; height: 6px; background: #000; border-radius: 3px; overflow: hidden; }
+        .progress-bar { height: 100%; background: var(--primary); width: 0%; transition: width 0.1s; }
 
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .hidden { display: none !important; }
+        .spinner { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -243,147 +211,111 @@
 
     <div class="app-container">
         
-        <!-- LEFT PANEL: Connection Management -->
+        <!-- LEFT PANEL: Connection -->
         <div class="card">
             <div class="card-title">Network Status</div>
-            
-            <div id="status-display" style="color: var(--primary); font-weight: bold; font-family: monospace;">
-                INITIALIZING...
-            </div>
+            <div id="status-display" style="color: var(--primary); font-weight: bold; font-family: monospace;">INITIALIZING...</div>
 
-            <!-- Auto-generated ID Area -->
             <div id="my-node-area">
                 <div class="card-title" style="margin-top: 10px;">Your Warp Code</div>
                 <div class="id-display" id="my-id">----</div>
-                
                 <div class="link-box">
                     <input type="text" id="share-link" readonly>
-                    <button class="btn" style="border-radius: 0 8px 8px 0;" onclick="copyLink()">COPY LINK</button>
+                    <button class="btn" style="border-radius: 0 8px 8px 0; font-size: 0.85rem !important; padding: 12px;" onclick="copyLink()">COPY</button>
                 </div>
             </div>
 
-            <hr style="border: 0; border-top: 1px solid var(--border); margin: 10px 0;">
+            <hr style="border: 0; border-top: 1px solid var(--border); margin: 5px 0;">
 
-            <!-- Manual Connect Area -->
             <div id="manual-connect-area">
                 <div class="card-title">Connect to a Node</div>
-                <input type="text" id="target-id" placeholder="ENTER 4-DIGIT CODE" style="width: 100%; padding: 14px; background: #000; border: 1px solid var(--border); color: #fff; border-radius: 8px; text-align: center; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;">
+                <input type="text" id="target-id" placeholder="ENTER 4-DIGIT CODE" style="width: 100%; background: #000; border: 1px solid var(--border); color: #fff; border-radius: 8px; text-align: center; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;">
                 <button class="btn" style="width: 100%; margin-top: 10px;" id="connect-btn" onclick="connectToPeer()">ESTABLISH TUNNEL</button>
             </div>
         </div>
 
-        <!-- RIGHT PANEL: File Transfer Portal -->
-        <div class="card" id="portal-panel" style="opacity: 0.5; pointer-events: none;">
+        <!-- RIGHT PANEL: Portal -->
+        <div class="card" id="portal-panel" style="opacity: 0.4; pointer-events: none;">
             <div class="card-title">Transfer Portal</div>
             
             <div class="portal" id="dropzone" onclick="document.getElementById('file-input').click()">
                 <div class="portal-icon">🌌</div>
                 <div class="portal-text">Awaiting Connection...</div>
-                <div class="portal-sub">Once connected, tap here or drag & drop multiple files to send.</div>
+                <div class="portal-sub">Tap here or drop files to send.</div>
                 <input type="file" id="file-input" multiple>
             </div>
 
             <div class="card-title" style="margin-top: 10px;">Transfer Log</div>
             <div class="transfer-log" id="transfer-log">
-                <div style="text-align: center; color: var(--text-dim); margin-top: 20px;">No files transferred yet.</div>
+                <div style="text-align: center; color: var(--text-dim); margin-top: 20px; font-size: 0.85rem;">No active transfers.</div>
             </div>
         </div>
-
     </div>
 
     <script>
-        // ==========================================
-        // APP STATE & CONFIG
-        // ==========================================
         const PREFIX = "aethersync-";
         let myPeer = null;
         let activeConnection = null;
 
-        // UI Elements
+        // Constants to prevent mobile memory crash
+        const CHUNK_SIZE = 64 * 1024; // 64 KB chunks
+        const MAX_BUFFER = 2 * 1024 * 1024; // Pause sending if buffer exceeds 2MB
+
         const statusDisplay = document.getElementById('status-display');
         const dropzone = document.getElementById('dropzone');
-        const portalText = document.querySelector('.portal-text');
-        const portalSub = document.querySelector('.portal-sub');
         const portalPanel = document.getElementById('portal-panel');
-        const fileInput = document.getElementById('file-input');
         const transferLog = document.getElementById('transfer-log');
 
-        // Generate Random 4-Letter Code
-        function generateCode() {
-            return Math.random().toString(36).substring(2, 6).toUpperCase();
-        }
-
-        // Format bytes to human readable
+        function generateCode() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
         function formatBytes(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024, sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            if (bytes === 0) return '0 B';
+            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
 
-        // ==========================================
-        // INITIALIZATION & ROUTING
-        // ==========================================
         window.addEventListener('DOMContentLoaded', () => {
             const shortID = generateCode();
-            const fullID = PREFIX + shortID;
+            myPeer = new Peer(PREFIX + shortID);
 
-            // Initialize PeerJS
-            myPeer = new Peer(fullID);
-
-            myPeer.on('open', (id) => {
+            myPeer.on('open', () => {
                 document.getElementById('my-id').innerText = shortID;
                 statusDisplay.innerText = "ONLINE - READY";
                 statusDisplay.style.color = "var(--success)";
                 
-                // Generate shareable link
-                const baseURL = window.location.href.split('?')[0];
-                const shareURL = `${baseURL}?warp=${shortID}`;
+                const shareURL = `${window.location.href.split('?')[0]}?warp=${shortID}`;
                 document.getElementById('share-link').value = shareURL;
 
-                // Check if user arrived via a share link!
-                const urlParams = new URLSearchParams(window.location.search);
-                const targetWarp = urlParams.get('warp');
+                const targetWarp = new URLSearchParams(window.location.search).get('warp');
                 if (targetWarp) {
                     document.getElementById('target-id').value = targetWarp.toUpperCase();
-                    connectToPeer(); // Auto-connect
+                    connectToPeer(); 
                 }
             });
 
-            // Listen for incoming connections
-            myPeer.on('connection', (conn) => {
-                handleConnection(conn);
-            });
-
+            myPeer.on('connection', (conn) => handleConnection(conn));
             myPeer.on('error', (err) => {
                 statusDisplay.innerText = "NETWORK ERROR";
                 statusDisplay.style.color = "#ef4444";
-                console.error(err);
+                document.getElementById('connect-btn').innerText = "ESTABLISH TUNNEL";
+                document.getElementById('connect-btn').disabled = false;
             });
         });
 
-        // ==========================================
-        // CONNECTION HANDLING
-        // ==========================================
         function connectToPeer() {
             const code = document.getElementById('target-id').value.toUpperCase();
-            if (code.length < 4) return alert("Enter a valid 4-digit code.");
+            if (code.length < 4) return alert("Enter valid code.");
 
             statusDisplay.innerText = "PUNCHING TUNNEL...";
             document.getElementById('connect-btn').innerHTML = '<div class="spinner"></div>';
             document.getElementById('connect-btn').disabled = true;
 
             const conn = myPeer.connect(PREFIX + code, { reliable: true });
-            
-            conn.on('open', () => {
-                handleConnection(conn);
-            });
+            conn.on('open', () => handleConnection(conn));
         }
 
         function handleConnection(conn) {
             activeConnection = conn;
-            
-            // Update UI to Connected State
             statusDisplay.innerText = "TUNNEL ESTABLISHED";
             statusDisplay.style.color = "var(--primary)";
             document.getElementById('connect-btn').innerText = "CONNECTED";
@@ -392,102 +324,164 @@
             portalPanel.style.opacity = "1";
             portalPanel.style.pointerEvents = "auto";
             dropzone.classList.add('active');
-            portalText.innerText = "Ready to Transmit";
-            portalSub.innerText = "Tap to select files or drag & drop them here.";
-            
-            // Clear empty log message
-            if (transferLog.innerText.includes("No files")) transferLog.innerHTML = '';
+            document.querySelector('.portal-text').innerText = "Ready to Transmit";
+            if (transferLog.innerText.includes("No active")) transferLog.innerHTML = '';
 
-            // Handle incoming data
-            activeConnection.on('data', (data) => {
-                receiveFile(data);
-            });
+            conn.on('data', (data) => processIncomingData(data));
         }
 
         // ==========================================
-        // FILE SENDING (Multiple Files)
+        // MOBILE-SAFE CHUNKED FILE SENDING
         // ==========================================
-        // 1. File Input Click
-        fileInput.addEventListener('change', (e) => {
-            sendFiles(e.target.files);
-            fileInput.value = ''; // Reset input
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            if(e.target.files.length > 0) processOutboundFiles(e.target.files);
+            e.target.value = '';
         });
 
-        // 2. Drag & Drop Handlers (Desktop)
-        dropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropzone.classList.add('dragover');
-        });
-        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-        dropzone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropzone.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
-                sendFiles(e.dataTransfer.files);
+        async function processOutboundFiles(files) {
+            for (let i = 0; i < files.length; i++) {
+                await sendFileSafely(files[i]);
             }
-        });
+        }
 
-        function sendFiles(files) {
-            if (!activeConnection || !activeConnection.open) return alert("Not connected.");
+        async function sendFileSafely(file) {
+            const fileId = Math.random().toString(36).substring(7);
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
             
-            Array.from(files).forEach(file => {
-                addLogEntry(file.name, file.size, "out");
-                
-                activeConnection.send({
-                    file: file, // Native File object sent directly over radio
-                    filename: file.name,
-                    filetype: file.type,
-                    filesize: file.size
-                });
+            createLogEntry(fileId, file.name, file.size, "out");
+
+            // 1. Send Header
+            activeConnection.send({
+                type: 'header',
+                fileId: fileId,
+                filename: file.name,
+                filetype: file.type,
+                filesize: file.size,
+                totalChunks: totalChunks
             });
+
+            // 2. Stream Chunks (Memory Safe)
+            let offset = 0;
+            let chunkIndex = 0;
+
+            while (offset < file.size) {
+                const slice = file.slice(offset, offset + CHUNK_SIZE);
+                const buffer = await slice.arrayBuffer(); // Load tiny chunk into RAM
+
+                activeConnection.send({
+                    type: 'chunk',
+                    fileId: fileId,
+                    chunkIndex: chunkIndex,
+                    data: buffer
+                });
+
+                offset += CHUNK_SIZE;
+                chunkIndex++;
+
+                // Update UI Progress
+                updateProgress(fileId, (chunkIndex / totalChunks) * 100);
+
+                // **THE MOBILE CRASH FIX: Buffer Throttling**
+                // If network gets clogged, wait so we don't crash the phone's memory.
+                while (activeConnection.dataChannel.bufferedAmount > MAX_BUFFER) {
+                    await new Promise(r => setTimeout(r, 50));
+                }
+            }
+
+            // 3. Send Completion Signal
+            activeConnection.send({ type: 'end', fileId: fileId });
+            updateProgress(fileId, 100, true);
         }
 
         // ==========================================
-        // FILE RECEIVING
+        // MOBILE-SAFE FILE RECEIVING
         // ==========================================
-        function receiveFile(data) {
-            addLogEntry(data.filename, data.filesize, "in");
+        let incomingFiles = {};
 
-            // Reconstruct Blob and Download
-            const blob = new Blob([data.file], { type: data.filetype });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = data.filename;
-            document.body.appendChild(a);
-            a.click();
-            
-            // Cleanup
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        function processIncomingData(data) {
+            if (data.type === 'header') {
+                incomingFiles[data.fileId] = {
+                    metadata: data,
+                    buffers: [],
+                    receivedChunks: 0
+                };
+                createLogEntry(data.fileId, data.filename, data.filesize, "in");
+            } 
+            else if (data.type === 'chunk') {
+                const fileData = incomingFiles[data.fileId];
+                if (!fileData) return;
+                
+                fileData.buffers.push(data.data);
+                fileData.receivedChunks++;
+                
+                const percent = (fileData.receivedChunks / fileData.metadata.totalChunks) * 100;
+                updateProgress(data.fileId, percent);
+            } 
+            else if (data.type === 'end') {
+                const fileData = incomingFiles[data.fileId];
+                if (!fileData) return;
+
+                // Reconstruct and save
+                const blob = new Blob(fileData.buffers, { type: fileData.metadata.filetype });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileData.metadata.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                updateProgress(data.fileId, 100, true);
+                
+                // Free memory immediately
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                delete incomingFiles[data.fileId];
+            }
         }
 
         // ==========================================
-        // UTILITIES
+        // UI HELPERS
         // ==========================================
-        function addLogEntry(name, size, direction) {
-            const badge = direction === "out" ? `<span class="badge-out">SENT ↗</span>` : `<span class="badge-in">RCVD ↙</span>`;
+        function createLogEntry(id, name, size, direction) {
+            const badge = direction === "out" ? `<span class="badge-out">SENDING ↗</span>` : `<span class="badge-in">RECEIVING ↙</span>`;
             const entry = document.createElement('div');
             entry.className = 'log-item';
+            entry.id = `log-${id}`;
             entry.innerHTML = `
-                <div class="log-name">${name}</div>
-                <div style="display: flex; gap: 15px; align-items: center;">
-                    <span class="log-size">${formatBytes(size)}</span>
-                    ${badge}
+                <div class="log-header">
+                    <span class="log-name">${name}</span>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <span style="color:var(--text-dim); font-size:0.75rem;">${formatBytes(size)}</span>
+                        <span id="badge-${id}">${badge}</span>
+                    </div>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="prog-${id}"></div>
                 </div>
             `;
-            transferLog.prepend(entry); // Add to top
+            transferLog.prepend(entry);
+        }
+
+        function updateProgress(id, percent, isComplete = false) {
+            const bar = document.getElementById(`prog-${id}`);
+            const badge = document.getElementById(`badge-${id}`);
+            if(bar) bar.style.width = `${percent}%`;
+            
+            if (isComplete && badge) {
+                if (badge.innerText.includes("SENDING")) badge.innerHTML = `<span class="badge-out" style="color:var(--text-main)">SENT ✓</span>`;
+                if (badge.innerText.includes("RECEIVING")) badge.innerHTML = `<span class="badge-in" style="color:var(--text-main)">SAVED ✓</span>`;
+                bar.style.background = "var(--text-dim)";
+            }
         }
 
         function copyLink() {
             const linkInput = document.getElementById('share-link');
             linkInput.select();
             document.execCommand('copy');
-            
             const btn = event.target;
             btn.innerText = "COPIED!";
-            setTimeout(() => btn.innerText = "COPY LINK", 2000);
+            setTimeout(() => btn.innerText = "COPY", 2000);
         }
     </script>
 </body>
