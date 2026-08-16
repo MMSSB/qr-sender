@@ -3,604 +3,802 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ChromaGrid</title>
+    <title>ChromaGrid // Turbo Optical Bridge</title>
     <style>
-        /* =========================================================
-           NATIVE APP SHELL STYLING
-           ========================================================= */
         :root {
-            --bg: #09090b;
-            --surface: #18181b;
-            --primary: #6d28d9;
-            --accent: #a855f7;
-            --text: #fafafa;
-            --muted: #a1a1aa;
-            --nav-bg: rgba(24, 24, 27, 0.85);
+            --bg-dark: #07090e;
+            --surface: #10141d;
+            --surface-border: #1c2433;
+            --neon-blue: #00f0ff;
+            --neon-purple: #9d4edd;
+            --neon-green: #00ff88;
+            --neon-amber: #ffb703;
+            --text-primary: #f8fafc;
+            --text-secondary: #64748b;
+            --font-mono: 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            height: 100dvh; /* Native mobile viewport height */
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            height: 100dvh;
             width: 100vw;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Prevent bouncing/scrolling */
-        }
-
-        /* App Header */
-        header {
-            padding: env(safe-area-inset-top) 20px 15px;
-            background: var(--bg);
-            text-align: center;
-            font-weight: 700;
-            font-size: 1.2rem;
-            letter-spacing: 1px;
-            border-bottom: 1px solid #27272a;
-            z-index: 10;
-        }
-        header span { color: var(--accent); }
-
-        /* View Container */
-        .view-container {
-            flex: 1;
-            position: relative;
             overflow: hidden;
         }
 
-        .view {
+        /* Top Bar */
+        header {
+            padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
+            background: rgba(16, 20, 29, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--surface-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .brand-cluster {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--neon-blue);
+        }
+
+        .pulse-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon-green);
+            box-shadow: 0 0 8px var(--neon-green);
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* Mode Tabs for Native Feel */
+        .mode-segmented-control {
+            display: flex;
+            background: #07090e;
+            padding: 2px;
+            border-radius: 8px;
+            border: 1px solid var(--surface-border);
+        }
+
+        .segment-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .segment-btn.active {
+            background: var(--neon-blue);
+            color: #000;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+        }
+
+        /* Screen Deck */
+        .app-deck {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .screen-pane {
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
+            inset: 0;
+            padding: 16px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
+            justify-content: space-between;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.3s ease;
+            transform: scale(0.98);
+            transition: all 0.25s ease-out;
         }
 
-        .view.active {
+        .screen-pane.active {
             opacity: 1;
             pointer-events: auto;
+            transform: scale(1);
         }
 
-        /* =========================================================
-           TRANSMITTER UI (SEND)
-           ========================================================= */
-        #tx-canvas {
+        /* Hardware Matrix Viewport */
+        .matrix-frame {
+            position: relative;
             width: 100%;
-            max-width: 350px;
+            max-width: 340px;
             aspect-ratio: 1;
             background: #000;
             border-radius: 16px;
-            box-shadow: 0 0 30px rgba(168, 85, 247, 0.2);
+            border: 1px solid var(--surface-border);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        }
+
+        #tx-canvas {
+            width: 100%;
+            height: 100%;
             image-rendering: pixelated;
         }
 
-        .file-fab {
-            margin-top: 30px;
-            background: linear-gradient(135deg, var(--primary), var(--accent));
-            color: white;
-            border: none;
-            padding: 18px 40px;
-            border-radius: 30px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            box-shadow: 0 10px 20px rgba(109, 40, 217, 0.4);
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-        .file-fab:active { transform: scale(0.95); }
-        input[type="file"] { display: none; }
-
-        .tx-stats {
-            margin-top: 20px;
-            text-align: center;
-            color: var(--muted);
-            font-size: 0.9rem;
-            font-family: monospace;
-        }
-
-        /* =========================================================
-           RECEIVER UI (RECEIVE)
-           ========================================================= */
-        .camera-container {
-            position: relative;
-            width: 100%;
-            max-width: 350px;
-            aspect-ratio: 1;
-            border-radius: 16px;
-            overflow: hidden;
-            background: #000;
-        }
-
-        #camera-feed {
+        video#rx-video {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
 
-        /* The Targeting Reticle */
-        .reticle {
-            position: absolute;
-            top: 10%; left: 10%; right: 10%; bottom: 10%;
-            border: 2px solid rgba(255,255,255,0.4);
-            border-radius: 8px;
-            box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
-            pointer-events: none;
-        }
-        
-        .reticle::after {
-            content: "ALIGN GRID HERE";
-            position: absolute;
-            top: -25px;
+        /* Tactical Optical HUD */
+        .hud-matrix {
             width: 100%;
-            text-align: center;
-            font-size: 0.7rem;
-            font-weight: 700;
-            letter-spacing: 2px;
-            color: var(--accent);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            background: var(--surface);
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid var(--surface-border);
         }
 
-        .rx-panel {
-            margin-top: 20px;
-            width: 100%;
-            max-width: 350px;
-            background: var(--surface);
-            border-radius: 16px;
-            padding: 20px;
+        .hud-node {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 2px;
         }
 
-        .progress-track { width: 100%; height: 8px; background: #27272a; border-radius: 4px; overflow: hidden; }
-        .progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.1s; }
-
-        .rx-btn {
-            background: var(--surface);
-            border: 1px solid #3f3f46;
-            color: white;
-            padding: 14px;
-            border-radius: 12px;
-            font-weight: 600;
-            margin-top: 10px;
+        .hud-key {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
         }
 
-        /* =========================================================
-           BOTTOM NAVIGATION
-           ========================================================= */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: var(--nav-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-top: 1px solid #27272a;
+        .hud-val {
+            font-family: var(--font-mono);
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--neon-blue);
+        }
+
+        .hud-val.green { color: var(--neon-green); }
+        .hud-val.purple { color: var(--neon-purple); }
+
+        /* Optical Targeting Reticle */
+        .optic-reticle {
+            position: absolute;
+            inset: 12%;
+            border: 2px dashed rgba(0, 240, 255, 0.6);
+            border-radius: 10px;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(7, 9, 14, 0.7);
+        }
+
+        .reticle-corner {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-color: var(--neon-green);
+            border-style: solid;
+        }
+        .rc-tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
+        .rc-tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
+        .rc-bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; }
+        .rc-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
+
+        /* Controls Section */
+        .control-pod {
+            width: 100%;
             display: flex;
-            padding-bottom: env(safe-area-inset-bottom);
-            z-index: 100;
+            flex-direction: column;
+            gap: 12px;
         }
 
-        .nav-item {
-            flex: 1;
-            padding: 18px 0;
-            text-align: center;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--muted);
-            transition: color 0.2s;
+        .action-button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 6px 20px rgba(0, 240, 255, 0.2);
+            transition: all 0.15s;
         }
 
-        .nav-item.active {
-            color: var(--accent);
+        .action-button:active { transform: scale(0.97); filter: brightness(1.2); }
+        .action-button.secondary {
+            background: var(--surface);
+            color: var(--text-primary);
+            border: 1px solid var(--surface-border);
+            box-shadow: none;
         }
 
-        #hidden-canvas { display: none; }
+        /* Progress Engine */
+        .gauge-bar-track {
+            width: 100%;
+            height: 6px;
+            background: #07090e;
+            border-radius: 3px;
+            border: 1px solid var(--surface-border);
+            overflow: hidden;
+        }
+
+        .gauge-bar-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-green));
+            transition: width 0.08s linear;
+        }
+
+        input[type="file"] { display: none; }
+        #hidden-scanner-canvas { display: none; }
     </style>
 </head>
 <body>
 
     <header>
-        CHROMA<span>GRID</span>
+        <div class="brand-cluster">
+            <div class="pulse-indicator"></div>
+            CHROMAGRID // TURBO
+        </div>
+        <div class="mode-segmented-control">
+            <button class="segment-btn active" onclick="activateDeck('tx')">TX (SEND)</button>
+            <button class="segment-btn" onclick="activateDeck('rx')">RX (RECEIVE)</button>
+        </div>
     </header>
 
-    <div class="view-container">
-        
-        <!-- SENDER VIEW -->
-        <div class="view active" id="view-send">
-            <canvas id="tx-canvas" width="240" height="240"></canvas>
-            
-            <button class="file-fab" onclick="document.getElementById('fileInput').click()">
-                SELECT PAYLOAD
-            </button>
-            <input type="file" id="fileInput">
-            
-            <div class="tx-stats">
-                <div id="tx-filename">NO FILE SELECTED</div>
-                <div id="tx-status" style="margin-top: 5px; color: var(--accent);">IDLE</div>
+    <div class="app-deck">
+        <!-- ================= SENDER SCREEN (TX) ================= -->
+        <div class="screen-pane active" id="deck-tx">
+            <div class="hud-matrix">
+                <div class="hud-node">
+                    <span class="hud-key">THROUGHPUT</span>
+                    <span class="hud-val green" id="tx-fps-val">30 FPS</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">BLOCK MATRIX</span>
+                    <span class="hud-val" id="tx-matrix-val">16x16</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">PAYLOAD</span>
+                    <span class="hud-val purple" id="tx-payload-val">0 KB</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">TOTAL FRAMES</span>
+                    <span class="hud-val" id="tx-frames-val">0</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">ACTIVE FRAME</span>
+                    <span class="hud-val green" id="tx-active-frame">0</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">TRANSMIT TIME</span>
+                    <span class="hud-val" id="tx-time-est">0.0s</span>
+                </div>
+            </div>
+
+            <div class="matrix-frame">
+                <canvas id="tx-canvas" width="256" height="256"></canvas>
+            </div>
+
+            <div class="gauge-bar-track">
+                <div class="gauge-bar-fill" id="tx-progress-bar"></div>
+            </div>
+
+            <div class="control-pod">
+                <button class="action-button secondary" onclick="document.getElementById('file-loader').click()">
+                    SELECT PAYLOAD FILE
+                </button>
+                <input type="file" id="file-loader">
+
+                <button class="action-button" id="tx-toggle-btn" disabled>
+                    START OPTICAL STREAM
+                </button>
             </div>
         </div>
 
-        <!-- RECEIVER VIEW -->
-        <div class="view" id="view-recv">
-            <div class="camera-container">
-                <video id="camera-feed" autoplay playsinline muted></video>
-                <div class="reticle"></div>
+        <!-- ================= RECEIVER SCREEN (RX) ================= -->
+        <div class="screen-pane" id="deck-rx">
+            <div class="hud-matrix">
+                <div class="hud-node">
+                    <span class="hud-key">CAPTURE RATE</span>
+                    <span class="hud-val green" id="rx-fps-val">0.0 FPS</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">INGESTED</span>
+                    <span class="hud-val" id="rx-blocks-val">0 / 0</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">SPEED</span>
+                    <span class="hud-val purple" id="rx-speed-val">0.0 KB/s</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">DROPPED</span>
+                    <span class="hud-val" id="rx-missing-val">0</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">ELAPSED</span>
+                    <span class="hud-val" id="rx-elapsed-val">0.0s</span>
+                </div>
+                <div class="hud-node">
+                    <span class="hud-key">VISION ENGINE</span>
+                    <span class="hud-val green">NATIVE 60Hz</span>
+                </div>
             </div>
 
-            <div class="rx-panel">
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted);">
-                    <span>INCOMING DATA</span>
-                    <span id="rx-percent">0%</span>
+            <div class="matrix-frame">
+                <video id="rx-video" autoplay playsinline muted></video>
+                <div class="optic-reticle" id="rx-reticle" style="display: none;">
+                    <div class="reticle-corner rc-tl"></div>
+                    <div class="reticle-corner rc-tr"></div>
+                    <div class="reticle-corner rc-bl"></div>
+                    <div class="reticle-corner rc-br"></div>
                 </div>
-                <div class="progress-track">
-                    <div class="progress-fill" id="rx-progress"></div>
-                </div>
-                <div id="rx-blocks" style="text-align: center; font-family: monospace; font-size: 0.8rem; margin-top: 5px;">0 / 0 BLOCKS</div>
-                
-                <button class="rx-btn" id="rxPowerBtn">ENABLE SENSOR</button>
+            </div>
+
+            <div class="gauge-bar-track">
+                <div class="gauge-bar-fill" id="rx-progress-bar"></div>
+            </div>
+
+            <div class="control-pod">
+                <button class="action-button" id="rx-power-btn">
+                    INITIALIZE CAMERA SENSOR
+                </button>
+                <button class="action-button secondary" id="rx-reset-btn">
+                    FLUSH BUFFER
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- NATIVE BOTTOM NAV -->
-    <div class="bottom-nav">
-        <div class="nav-item active" onclick="switchView('send')">TRANSMIT</div>
-        <div class="nav-item" onclick="switchView('recv')">RECEIVE</div>
-    </div>
-
-    <canvas id="hidden-canvas"></canvas>
+    <canvas id="hidden-scanner-canvas"></canvas>
 
     <script>
-        // =========================================================
-        // APP NAVIGATION LOGIC
-        // =========================================================
-        function switchView(viewName) {
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            
-            if(viewName === 'send') {
-                document.getElementById('view-send').classList.add('active');
-                document.querySelectorAll('.nav-item')[0].classList.add('active');
-            } else {
-                document.getElementById('view-recv').classList.add('active');
-                document.querySelectorAll('.nav-item')[1].classList.add('active');
-            }
-        }
+        /* ==========================================================================
+           1. CORE CHROMATIC PROTOCOL DEFINITIONS
+           ========================================================================== */
+        const GRID_DIM = 16;
+        const CELL_COUNT = GRID_DIM * GRID_DIM; // 256 cells
+        
+        // 4 Calibration corners + 1 Clock cell = 5 reserved cells
+        // Cell 0: Clock (Alternates High Brightness Yellow / Cyan)
+        // Cell 15: Top-Right Sync Anchor (Red)
+        // Cell 240: Bottom-Left Sync Anchor (Green)
+        // Cell 255: Bottom-Right Sync Anchor (Blue)
+        // Remaining Data Cells = 251 cells
+        const HEADER_CELLS = 16; // 8 cells for Frame Index (16-bit), 8 cells for Total Frames (16-bit)
+        const PAYLOAD_CELLS = CELL_COUNT - 4 - 1 - HEADER_CELLS; // 235 usable cells
+        const BYTES_PER_FRAME = Math.floor((PAYLOAD_CELLS * 2) / 8); // 58 raw bytes per visual frame!
 
-        // =========================================================
-        // PROTOCOL CONSTANTS
-        // =========================================================
-        // We use a 12x12 grid. 144 blocks total.
-        const GRID_SIZE = 12;
-        const TOTAL_BLOCKS = GRID_SIZE * GRID_SIZE; 
-        const BLOCKS_FOR_HEADER = 16; // 8 for FrameIdx, 8 for TotalFrames
-        const DATA_BLOCKS_PER_FRAME = TOTAL_BLOCKS - 1 - BLOCKS_FOR_HEADER; // 127 blocks
-        const BYTES_PER_FRAME = Math.floor((DATA_BLOCKS_PER_FRAME * 2) / 8); // 31 bytes per frame
-
-        // Color Palette (2-bit encoding)
-        // 00 = Red, 01 = Green, 10 = Blue, 11 = White
-        const PALETTE = [
-            [255, 0, 0],    // Red
-            [0, 255, 0],    // Green
-            [0, 100, 255],  // Blue (Tweaked for camera distinction)
-            [255, 255, 255] // White
+        // High-Contrast Primary Palette (2-bit encoding)
+        const CHROMATIC_PALETTE = [
+            [255, 0, 50],    // 00: Neon Red
+            [0, 255, 120],   // 01: Neon Green
+            [0, 140, 255],   // 10: Neon Azure Blue
+            [255, 255, 255]  // 11: Pure White
         ];
 
-        // =========================================================
-        // TRANSMITTER (TX) ENGINE
-        // =========================================================
-        const txCanvas = document.getElementById('tx-canvas');
-        const txCtx = txCanvas.getContext('2d');
-        const blockSize = txCanvas.width / GRID_SIZE;
-        
-        let txFrames = []; // Stores the pre-calculated grid maps
-        let isTransmitting = false;
-        let txLoop = null;
+        /* ==========================================================================
+           2. UI CONTROLLER
+           ========================================================================== */
+        function activateDeck(mode) {
+            document.querySelectorAll('.screen-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.segment-btn').forEach(el => el.classList.remove('active'));
 
-        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            if (mode === 'tx') {
+                document.getElementById('deck-tx').classList.add('active');
+            } else {
+                document.getElementById('deck-rx').classList.add('active');
+            }
+            event.target.classList.add('active');
+        }
+
+        /* ==========================================================================
+           3. TURBO TRANSMITTER ENGINE (Zero-Copy Buffer Processing)
+           ========================================================================== */
+        const txCanvas = document.getElementById('tx-canvas');
+        const txCtx = txCanvas.getContext('2d', { alpha: false });
+        const fileLoader = document.getElementById('file-loader');
+        const txToggleBtn = document.getElementById('tx-toggle-btn');
+        
+        let txFrameBuffer = [];
+        let txIsStreaming = false;
+        let txIntervalId = null;
+        let txCurrentFrameIdx = 0;
+        let txClockState = 0;
+
+        fileLoader.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            document.getElementById('tx-filename').innerText = file.name;
-            document.getElementById('tx-status').innerText = "ENCODING CHROMAGRID...";
+            document.getElementById('tx-payload-val').innerText = `${(file.size / 1024).toFixed(1)} KB`;
             
-            // Read file as raw binary buffer
-            const arrayBuffer = await file.arrayBuffer();
-            const byteArray = new Uint8Array(arrayBuffer);
+            // Binary Pack: [Filename Length (1B)] + [Filename] + [Raw Bytes]
+            const nameBuffer = new TextEncoder().encode(file.name);
+            const fileBuffer = new Uint8Array(await file.arrayBuffer());
             
-            // Encode file name into the data stream so receiver knows what to save it as
-            const nameBytes = new TextEncoder().encode(file.name + "|||");
-            
-            // Combine name and file data
-            const fullData = new Uint8Array(nameBytes.length + byteArray.length);
-            fullData.set(nameBytes);
-            fullData.set(byteArray, nameBytes.length);
+            const totalPayload = new Uint8Array(1 + nameBuffer.length + fileBuffer.length);
+            totalPayload[0] = nameBuffer.length;
+            totalPayload.set(nameBuffer, 1);
+            totalPayload.set(fileBuffer, 1 + nameBuffer.length);
 
-            buildOpticalFrames(fullData);
+            compileOpticalFrames(totalPayload);
         });
 
-        function buildOpticalFrames(dataBytes) {
-            txFrames = [];
-            const totalFrames = Math.ceil(dataBytes.length / BYTES_PER_FRAME);
-            
-            let byteOffset = 0;
+        function compileOpticalFrames(payload) {
+            txFrameBuffer = [];
+            const totalFrames = Math.ceil(payload.length / BYTES_PER_FRAME);
+            document.getElementById('tx-frames-val').innerText = totalFrames;
+            document.getElementById('tx-time-est').innerText = `${(totalFrames / 30).toFixed(1)}s`;
+
+            let byteCursor = 0;
+            const cellSize = txCanvas.width / GRID_DIM;
 
             for (let f = 0; f < totalFrames; f++) {
-                let frameBlocks = new Array(TOTAL_BLOCKS).fill(0);
-                let blockIdx = 1; // Start at 1. Block 0 is the Clock.
+                const cellMap = new Uint8Array(CELL_COUNT);
 
-                // Encode Frame Index (16 bits = 8 blocks)
-                for (let i = 7; i >= 0; i--) { frameBlocks[blockIdx++] = (f >> (i * 2)) & 3; }
-                
-                // Encode Total Frames (16 bits = 8 blocks)
-                for (let i = 7; i >= 0; i--) { frameBlocks[blockIdx++] = (totalFrames >> (i * 2)) & 3; }
+                // Anchors (Calibration Targets)
+                cellMap[0] = 0; // Clock anchor placeholder
+                cellMap[15] = 0; // Top-Right Sync: Red
+                cellMap[240] = 1; // Bottom-Left Sync: Green
+                cellMap[255] = 2; // Bottom-Right Sync: Blue
 
-                // Encode Payload Data
+                let targetCell = 1;
+
+                // Write Frame Index (16 bits = 8 cells)
+                for (let i = 7; i >= 0; i--) {
+                    if (targetCell === 15 || targetCell === 240) targetCell++;
+                    cellMap[targetCell++] = (f >> (i * 2)) & 3;
+                }
+
+                // Write Total Frames (16 bits = 8 cells)
+                for (let i = 7; i >= 0; i--) {
+                    if (targetCell === 15 || targetCell === 240) targetCell++;
+                    cellMap[targetCell++] = (totalFrames >> (i * 2)) & 3;
+                }
+
+                // Write 58-Byte Payload
                 for (let b = 0; b < BYTES_PER_FRAME; b++) {
-                    if (byteOffset < dataBytes.length) {
-                        const byte = dataBytes[byteOffset++];
-                        frameBlocks[blockIdx++] = (byte >> 6) & 3;
-                        frameBlocks[blockIdx++] = (byte >> 4) & 3;
-                        frameBlocks[blockIdx++] = (byte >> 2) & 3;
-                        frameBlocks[blockIdx++] = byte & 3;
-                    } else {
-                        // Pad with zeros if end of file
-                        blockIdx += 4;
+                    if (byteCursor < payload.length) {
+                        const byte = payload[byteCursor++];
+                        for (let shift = 6; shift >= 0; shift -= 2) {
+                            while (targetCell === 15 || targetCell === 240 || targetCell === 255) targetCell++;
+                            if (targetCell < CELL_COUNT) {
+                                cellMap[targetCell++] = (byte >> shift) & 3;
+                            }
+                        }
                     }
                 }
-                txFrames.push(frameBlocks);
+
+                txFrameBuffer.push(cellMap);
             }
 
-            document.getElementById('tx-status').innerText = `READY - ${totalFrames} FRAMES`;
-            startOpticalBroadcast();
+            txToggleBtn.disabled = false;
+            txToggleBtn.innerText = "START OPTICAL STREAM (30 FPS)";
         }
 
-        function startOpticalBroadcast() {
-            clearInterval(txLoop);
-            let currentFrame = 0;
-            let clockState = true;
+        txToggleBtn.addEventListener('click', () => {
+            txIsStreaming ? stopTxStream() : startTxStream();
+        });
 
-            // Broadcast at 10 FPS for mobile camera reliability
-            txLoop = setInterval(() => {
-                const grid = txFrames[currentFrame];
+        function startTxStream() {
+            txIsStreaming = true;
+            txToggleBtn.innerText = "HALT TRANSMISSION";
+            txToggleBtn.classList.replace('action-button', 'action-button secondary');
+
+            const cellSize = txCanvas.width / GRID_DIM;
+            const intervalMs = 1000 / 30; // Solid 30 FPS Stream
+
+            txIntervalId = setInterval(() => {
+                const cellMap = txFrameBuffer[txCurrentFrameIdx];
                 
-                for (let i = 0; i < TOTAL_BLOCKS; i++) {
-                    const row = Math.floor(i / GRID_SIZE);
-                    const col = i % GRID_SIZE;
-                    
+                // Draw Grid
+                for (let i = 0; i < CELL_COUNT; i++) {
+                    const col = i % GRID_DIM;
+                    const row = Math.floor(i / GRID_DIM);
+
                     if (i === 0) {
-                        // Clock Pixel: Alternates Yellow and Cyan to tell Receiver "NEW FRAME"
-                        txCtx.fillStyle = clockState ? "#ffff00" : "#00ffff";
+                        // High-contrast alternating clock cell
+                        txCtx.fillStyle = txClockState ? "#ffff00" : "#00ffff";
+                    } else if (i === 15) {
+                        txCtx.fillStyle = "#ff0032";
+                    } else if (i === 240) {
+                        txCtx.fillStyle = "#00ff78";
+                    } else if (i === 255) {
+                        txCtx.fillStyle = "#008cff";
                     } else {
-                        const colorCode = grid[i];
-                        const rgb = PALETTE[colorCode];
+                        const colorCode = cellMap[i];
+                        const rgb = CHROMATIC_PALETTE[colorCode];
                         txCtx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
                     }
-                    
-                    txCtx.fillRect(col * blockSize, row * blockSize, blockSize, blockSize);
+
+                    txCtx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
                 }
 
-                currentFrame = (currentFrame + 1) % txFrames.length;
-                clockState = !clockState; // Flip clock
-                
-            }, 100); 
+                document.getElementById('tx-active-frame').innerText = txCurrentFrameIdx + 1;
+                document.getElementById('tx-progress-bar').style.width = `${((txCurrentFrameIdx + 1) / txFrameBuffer.length) * 100}%`;
+
+                txCurrentFrameIdx = (txCurrentFrameIdx + 1) % txFrameBuffer.length;
+                txClockState = !txClockState;
+            }, intervalMs);
         }
 
-        // =========================================================
-        // RECEIVER (RX) ENGINE - RAW PIXEL SAMPLER
-        // =========================================================
-        const video = document.getElementById('camera-feed');
-        const hCanvas = document.getElementById('hidden-canvas');
-        const hCtx = hCanvas.getContext('2d', { willReadFrequently: true });
-        
-        let rxStream = null;
-        let isReceiving = false;
-        let rxFramesData = new Map();
-        let expectedTotalFrames = 0;
-        let lastClockState = -1;
+        function stopTxStream() {
+            txIsStreaming = false;
+            clearInterval(txIntervalId);
+            txToggleBtn.innerText = "RESUME OPTICAL STREAM";
+            txToggleBtn.classList.replace('action-button secondary', 'action-button');
+        }
 
-        document.getElementById('rxPowerBtn').addEventListener('click', async () => {
-            if (isReceiving) {
-                stopReceiver();
-            } else {
-                startReceiver();
-            }
+        /* ==========================================================================
+           4. TURBO RECEIVER VISION ENGINE (Sub-Millisecond Color Distance)
+           ========================================================================== */
+        const rxVideo = document.getElementById('rx-video');
+        const scannerCanvas = document.getElementById('hidden-scanner-canvas');
+        const sCtx = scannerCanvas.getContext('2d', { willReadFrequently: true });
+        const rxPowerBtn = document.getElementById('rx-power-btn');
+        const rxResetBtn = document.getElementById('rx-reset-btn');
+
+        let rxStream = null;
+        let rxIsScanning = false;
+        let rxReceivedMap = new Map();
+        let rxExpectedFrames = 0;
+        let rxLastClockState = -1;
+        
+        // Telemetry
+        let rxDecodedCounter = 0;
+        let rxStartTime = null;
+        let rxLastTimestamp = performance.now();
+
+        rxPowerBtn.addEventListener('click', async () => {
+            rxIsScanning ? stopReceiver() : startReceiver();
         });
 
         async function startReceiver() {
             try {
                 rxStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment", width: { ideal: 1080 } }
+                    video: {
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        focusMode: { ideal: "continuous" }
+                    }
                 });
-                video.srcObject = rxStream;
-                await video.play();
-                isReceiving = true;
-                
-                document.getElementById('rxPowerBtn').innerText = "DISABLE SENSOR";
-                document.getElementById('rxPowerBtn').style.color = "var(--accent)";
-                
-                // Match hidden canvas to video dimensions
-                hCanvas.width = video.videoWidth;
-                hCanvas.height = video.videoHeight;
+                rxVideo.srcObject = rxStream;
+                await rxVideo.play();
 
-                requestAnimationFrame(scanPixels);
+                rxIsScanning = true;
+                document.getElementById('rx-reticle').style.display = "block";
+                rxPowerBtn.innerText = "DISABLE CAMERA SENSOR";
+                rxPowerBtn.classList.replace('action-button', 'action-button secondary');
+
+                scannerCanvas.width = 640;
+                scannerCanvas.height = 640;
+
+                requestAnimationFrame(processVisionFrame);
             } catch (err) {
-                alert("Camera access denied.");
+                alert("Camera Initialization Failed: " + err.message);
             }
         }
 
         function stopReceiver() {
-            isReceiving = false;
+            rxIsScanning = false;
             if (rxStream) rxStream.getTracks().forEach(t => t.stop());
-            document.getElementById('rxPowerBtn').innerText = "ENABLE SENSOR";
-            document.getElementById('rxPowerBtn').style.color = "white";
+            document.getElementById('rx-reticle').style.display = "none";
+            rxPowerBtn.innerText = "INITIALIZE CAMERA SENSOR";
+            rxPowerBtn.classList.replace('action-button secondary', 'action-button');
         }
 
-        // Finds the closest matching protocol color to account for camera tint
-        function getClosestColorCode(r, g, b) {
-            let minDist = Infinity;
-            let closestCode = 0;
-            for (let i = 0; i < PALETTE.length; i++) {
-                const pr = PALETTE[i][0];
-                const pg = PALETTE[i][1];
-                const pb = PALETTE[i][2];
-                // Euclidean distance in RGB space
-                const dist = Math.pow(r - pr, 2) + Math.pow(g - pg, 2) + Math.pow(b - pb, 2);
-                if (dist < minDist) {
-                    minDist = dist;
-                    closestCode = i;
+        rxResetBtn.addEventListener('click', () => {
+            rxReceivedMap.clear();
+            rxExpectedFrames = 0;
+            rxStartTime = null;
+            document.getElementById('rx-progress-bar').style.width = "0%";
+            document.getElementById('rx-blocks-val').innerText = "0 / 0";
+            document.getElementById('rx-missing-val').innerText = "0";
+            document.getElementById('rx-speed-val').innerText = "0.0 KB/s";
+        });
+
+        // Fast Manhattan Color-Distance Metric
+        function resolveColorIndex(r, g, b) {
+            let minDistance = 999999;
+            let targetIdx = 0;
+
+            for (let i = 0; i < 4; i++) {
+                const pr = CHROMATIC_PALETTE[i][0];
+                const pg = CHROMATIC_PALETTE[i][1];
+                const pb = CHROMATIC_PALETTE[i][2];
+
+                const distance = Math.abs(r - pr) + Math.abs(g - pg) + Math.abs(b - pb);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    targetIdx = i;
                 }
             }
-            return closestCode;
+            return targetIdx;
         }
 
-        function scanPixels() {
-            if (!isReceiving) return;
+        function processVisionFrame(now) {
+            if (!rxIsScanning) return;
 
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                hCtx.drawImage(video, 0, 0, hCanvas.width, hCanvas.height);
+            if (rxVideo.readyState === rxVideo.HAVE_ENOUGH_DATA) {
+                // Square crop extraction mapped directly to canvas
+                const minSide = Math.min(rxVideo.videoWidth, rxVideo.videoHeight);
+                const startX = (rxVideo.videoWidth - minSide) / 2;
+                const startY = (rxVideo.videoHeight - minSide) / 2;
+
+                sCtx.drawImage(rxVideo, startX, startY, minSide, minSide, 0, 0, 640, 640);
                 
-                // The reticle is centered and occupies 80% of the view (10% margins)
-                // We need to sample the video pixels corresponding to that square.
-                
-                // Mobile object-fit: cover logic dictates how video is cropped. 
-                // For prototype simplicity, we assume square video crop in center.
-                const minDim = Math.min(hCanvas.width, hCanvas.height);
-                const reticleSize = minDim * 0.8;
-                const startX = (hCanvas.width - reticleSize) / 2;
-                const startY = (hCanvas.height - reticleSize) / 2;
-                const step = reticleSize / GRID_SIZE;
+                // Inspect Reticle Central Bounding Region
+                const reticleDim = 640 * 0.76;
+                const offsetX = (640 - reticleDim) / 2;
+                const offsetY = (640 - reticleDim) / 2;
+                const cellStep = reticleDim / GRID_DIM;
 
-                const imgData = hCtx.getImageData(startX, startY, reticleSize, reticleSize);
-                const data = imgData.data;
+                const framePixels = sCtx.getImageData(offsetX, offsetY, reticleDim, reticleDim);
+                const rawData = framePixels.data;
+                const rowWidth = framePixels.width;
 
-                // 1. Read Clock Pixel (Block 0,0)
-                // Sample the exact center of block 0,0
-                const cX = Math.floor(step / 2);
-                const cY = Math.floor(step / 2);
-                const cIdx = (cY * imgData.width + cX) * 4;
-                const r = data[cIdx], g = data[cIdx+1], b = data[cIdx+2];
+                // 1. Sample Clock Pixel (Top-Left Cell)
+                const clkX = Math.floor(cellStep * 0.5);
+                const clkY = Math.floor(cellStep * 0.5);
+                const clkIdx = (clkY * rowWidth + clkX) * 4;
+                const cr = rawData[clkIdx], cg = rawData[clkIdx + 1], cb = rawData[clkIdx + 2];
 
-                // Detect Clock: Yellow(>200, >200, <100) vs Cyan(<100, >200, >200)
+                // Detect Clock Color Transition: Yellow(>150, >150, <100) vs Cyan(<100, >150, >150)
                 let currentClock = -1;
-                if (r > 150 && g > 150 && b < 100) currentClock = 1; // Yellow
-                if (r < 100 && g > 150 && b > 150) currentClock = 0; // Cyan
+                if (cr > 140 && cg > 140 && cb < 120) currentClock = 1; // Yellow
+                if (cr < 120 && cg > 140 && cb > 140) currentClock = 0; // Cyan
 
-                // If clock flipped, it's a new frame!
-                if (currentClock !== -1 && currentClock !== lastClockState) {
-                    lastClockState = currentClock;
-                    decodeFrame(data, step, imgData.width);
+                // Instant Ingestion on Optical Clock Flip
+                if (currentClock !== -1 && currentClock !== rxLastClockState) {
+                    rxLastClockState = currentClock;
+                    decodeOpticalMatrix(rawData, cellStep, rowWidth);
+                }
+
+                // Telemetry Calculation
+                rxDecodedCounter++;
+                if (now - rxLastTimestamp >= 500) {
+                    const elapsed = (now - rxLastTimestamp) / 1000;
+                    document.getElementById('rx-fps-val').innerText = `${(rxDecodedCounter / elapsed).toFixed(1)} FPS`;
+
+                    if (rxStartTime) {
+                        const totalSec = ((now - rxStartTime) / 1000).toFixed(1);
+                        document.getElementById('rx-elapsed-val').innerText = `${totalSec}s`;
+                        
+                        const totalBytes = rxReceivedMap.size * BYTES_PER_FRAME;
+                        document.getElementById('rx-speed-val').innerText = `${((totalBytes / 1024) / totalSec).toFixed(1)} KB/s`;
+                    }
+
+                    rxDecodedCounter = 0;
+                    rxLastTimestamp = now;
                 }
             }
 
-            requestAnimationFrame(scanPixels);
+            requestAnimationFrame(processVisionFrame);
         }
 
-        function decodeFrame(pixelData, step, rowWidth) {
-            let blockIdx = 1;
+        function decodeOpticalMatrix(pixelData, step, rowWidth) {
+            let targetCell = 1;
             let frameIdx = 0;
             let totalFrames = 0;
-            let payloadBytes = new Uint8Array(BYTES_PER_FRAME);
-            let byteOffset = 0;
-            let currentByte = 0;
+
+            const payloadBytes = new Uint8Array(BYTES_PER_FRAME);
+            let bytePtr = 0;
+            let shiftBuffer = 0;
             let bitCount = 0;
 
-            for (let i = 1; i < TOTAL_BLOCKS; i++) {
-                const row = Math.floor(i / GRID_SIZE);
-                const col = i % GRID_SIZE;
-                
-                // Sample center of each block
-                const pxX = Math.floor((col * step) + (step / 2));
-                const pxY = Math.floor((row * step) + (step / 2));
-                
-                const idx = (pxY * rowWidth + pxX) * 4;
-                const code = getClosestColorCode(pixelData[idx], pixelData[idx+1], pixelData[idx+2]);
+            for (let i = 1; i < CELL_COUNT; i++) {
+                if (i === 15 || i === 240 || i === 255) continue; // Skip sync anchors
+
+                const col = i % GRID_DIM;
+                const row = Math.floor(i / GRID_DIM);
+
+                const px = Math.floor((col * step) + (step * 0.5));
+                const py = Math.floor((row * step) + (step * 0.5));
+                const idx = (py * rowWidth + px) * 4;
+
+                const code = resolveColorIndex(pixelData[idx], pixelData[idx + 1], pixelData[idx + 2]);
 
                 if (i >= 1 && i <= 8) {
-                    // Frame Index
                     frameIdx = (frameIdx << 2) | code;
                 } else if (i >= 9 && i <= 16) {
-                    // Total Frames
                     totalFrames = (totalFrames << 2) | code;
                 } else {
-                    // Payload
-                    currentByte = (currentByte << 2) | code;
+                    shiftBuffer = (shiftBuffer << 2) | code;
                     bitCount += 2;
                     if (bitCount === 8) {
-                        payloadBytes[byteOffset++] = currentByte;
-                        currentByte = 0;
+                        if (bytePtr < BYTES_PER_FRAME) {
+                            payloadBytes[bytePtr++] = shiftBuffer;
+                        }
+                        shiftBuffer = 0;
                         bitCount = 0;
                     }
                 }
             }
 
-            if (totalFrames > 0 && !rxFramesData.has(frameIdx)) {
-                rxFramesData.set(frameIdx, payloadBytes);
-                expectedTotalFrames = totalFrames;
-                updateProgress();
+            if (!rxStartTime && totalFrames > 0) rxStartTime = performance.now();
+
+            if (totalFrames > 0 && !rxReceivedMap.has(frameIdx)) {
+                rxReceivedMap.set(frameIdx, payloadBytes);
+                rxExpectedFrames = totalFrames;
+
+                const count = rxReceivedMap.size;
+                const percent = ((count / totalFrames) * 100).toFixed(0);
+
+                document.getElementById('rx-progress-bar').style.width = `${percent}%`;
+                document.getElementById('rx-blocks-val').innerText = `${count} / ${totalFrames}`;
+                document.getElementById('rx-missing-val').innerText = totalFrames - count;
+
+                if (count === totalFrames && totalFrames > 0) {
+                    assembleFilePipeline();
+                }
             }
         }
 
-        function updateProgress() {
-            const count = rxFramesData.size;
-            const pct = Math.round((count / expectedTotalFrames) * 100);
-            
-            document.getElementById('rx-percent').innerText = `${pct}%`;
-            document.getElementById('rx-progress').style.width = `${pct}%`;
-            document.getElementById('rx-blocks').innerText = `${count} / ${expectedTotalFrames} BLOCKS`;
-
-            if (count === expectedTotalFrames && expectedTotalFrames > 0) {
-                assembleFile();
-            }
-        }
-
-        function assembleFile() {
+        function assembleFilePipeline() {
             stopReceiver();
+
+            // Assemble Binary Buffer
+            const totalBytes = rxExpectedFrames * BYTES_PER_FRAME;
+            const fullStream = new Uint8Array(totalBytes);
             
-            // Stitch all bytes together
-            const fullArray = new Uint8Array(expectedTotalFrames * BYTES_PER_FRAME);
-            let offset = 0;
-            for (let i = 0; i < expectedTotalFrames; i++) {
-                fullArray.set(rxFramesData.get(i), offset);
-                offset += BYTES_PER_FRAME;
+            for (let i = 0; i < rxExpectedFrames; i++) {
+                fullStream.set(rxReceivedMap.get(i), i * BYTES_PER_FRAME);
             }
 
-            // Extract filename (split by "|||")
-            const textDecoder = new TextDecoder();
-            const decodedString = textDecoder.decode(fullArray);
-            const splitIdx = decodedString.indexOf("|||");
-            
-            let finalFileName = "chromagrid_transfer.bin";
-            let fileDataArray = fullArray;
+            // Extract Filename & Data
+            const nameLen = fullStream[0];
+            const nameBytes = fullStream.slice(1, 1 + nameLen);
+            const fileName = new TextDecoder().decode(nameBytes);
+            const filePayload = fullStream.slice(1 + nameLen);
 
-            if (splitIdx !== -1) {
-                finalFileName = decodedString.substring(0, splitIdx);
-                // Calculate byte offset of the "|||" separator
-                const headerBytes = new TextEncoder().encode(finalFileName + "|||").length;
-                fileDataArray = fullArray.slice(headerBytes);
-            }
-
-            // Trigger Download
-            const blob = new Blob([fileDataArray]);
+            // Trigger Direct Binary Download
+            const blob = new Blob([filePayload]);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = finalFileName;
+            a.download = fileName || "chromagrid_received_file.bin";
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            
-            document.getElementById('rx-blocks').innerText = "TRANSFER COMPLETE";
-            document.getElementById('rx-blocks').style.color = "var(--accent)";
-            
-            // Clean up memory
-            setTimeout(() => { URL.revokeObjectURL(url); rxFramesData.clear(); expectedTotalFrames = 0; }, 5000);
+
+            alert("TRANSFER COMPLETE: " + fileName);
         }
     </script>
 </body>
