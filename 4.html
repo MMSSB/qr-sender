@@ -3,22 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AetherSync // P2P Radio Tunnel</title>
+    <title>AetherSync // P2P Portal</title>
     
-    <!-- PeerJS: Lightweight WebRTC Wrapper -->
+    <!-- Lightweight WebRTC Library -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     
     <style>
         :root {
-            --bg: #050505;
-            --surface: #121212;
-            --border: #2a2a2a;
-            --accent: #ff3366;
-            --accent-hover: #ff0040;
-            --success: #00ff88;
-            --text-main: #ffffff;
-            --text-dim: #888888;
-            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --bg: #09090b;
+            --surface: #18181b;
+            --surface-hover: #27272a;
+            --border: #3f3f46;
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.5);
+            --success: #10b981;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --radius: 16px;
+            --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,306 +29,465 @@
             font-family: var(--font);
             background-color: var(--bg);
             color: var(--text-main);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             min-height: 100vh;
-            padding: 20px;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-            margin-top: 20px;
-        }
-
-        h1 {
-            font-weight: 900;
-            letter-spacing: -1px;
-            font-size: 2rem;
-        }
-
-        h1 span { color: var(--accent); }
-        
-        .subtitle {
-            color: var(--text-dim);
-            font-size: 0.85rem;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            margin-top: 5px;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 400px;
             display: flex;
             flex-direction: column;
-            gap: 20px;
         }
 
+        /* Top Navigation */
+        header {
+            padding: 20px;
+            background: rgba(24, 24, 27, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; }
+        h1 span { color: var(--primary); }
+
+        /* Main Layout Grid */
+        .app-container {
+            flex: 1;
+            padding: 20px;
+            display: grid;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Desktop Layout */
+        @media (min-width: 800px) {
+            .app-container {
+                grid-template-columns: 350px 1fr;
+                align-items: start;
+                padding: 40px 20px;
+            }
+        }
+
+        /* Cards */
         .card {
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: var(--radius);
             padding: 24px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            position: relative;
-            overflow: hidden;
+            gap: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
-        /* Subtle glow effect */
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            opacity: 0.5;
-        }
-
-        h2 { font-size: 1.1rem; color: var(--text-dim); margin-bottom: 5px; }
-
-        .btn {
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            padding: 16px;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-            width: 100%;
-        }
-
-        .btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
-        .btn:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
-
-        .btn.outline {
-            background: transparent;
-            border: 2px solid var(--border);
-            color: var(--text-main);
-        }
-        .btn.outline:hover { border-color: var(--accent); }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 16px;
-            background: #000;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: #fff;
-            font-size: 1.2rem;
-            text-align: center;
-            font-weight: bold;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            outline: none;
-            transition: border 0.2s;
-        }
-
-        input[type="text"]:focus { border-color: var(--accent); }
-        input[type="file"] { display: none; }
-
-        .status-box {
-            background: #000;
-            padding: 12px;
-            border-radius: 8px;
-            font-family: monospace;
+        .card-title {
             font-size: 0.85rem;
-            color: var(--success);
-            text-align: center;
-            border: 1px solid var(--border);
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
         }
 
+        /* Connection Section */
         .id-display {
             font-size: 2.5rem;
             font-weight: 900;
             text-align: center;
-            letter-spacing: 4px;
-            color: var(--accent);
-            margin: 10px 0;
+            color: var(--primary);
+            letter-spacing: 2px;
+            background: #000;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px dashed var(--border);
             user-select: all;
         }
 
+        .link-box {
+            display: flex;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .link-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 12px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 14px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover:not(:disabled) {
+            filter: brightness(1.1);
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+        .btn-outline:hover { background: var(--surface-hover); }
+
+        /* File Dropzone / Portal */
+        .portal {
+            position: relative;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+            text-align: center;
+            background: rgba(0,0,0,0.2);
+            transition: all 0.2s;
+            min-height: 250px;
+        }
+
+        .portal.active {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .portal.dragover {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+            transform: scale(1.02);
+        }
+
+        .portal-icon { font-size: 3rem; margin-bottom: 10px; opacity: 0.8; }
+        .portal-text { font-size: 1.1rem; font-weight: 600; }
+        .portal-sub { font-size: 0.85rem; color: var(--text-dim); margin-top: 5px; }
+
+        input[type="file"] { display: none; }
+
+        /* Transfer Log */
+        .transfer-log {
+            flex: 1;
+            background: #000;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 16px;
+            overflow-y: auto;
+            max-height: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .log-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: var(--surface);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .log-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+        .log-size { color: var(--text-dim); }
+        .badge-out { color: var(--primary); font-weight: bold; }
+        .badge-in { color: var(--success); font-weight: bold; }
+
         .hidden { display: none !important; }
+        
+        /* Loading Spinner */
+        .spinner {
+            width: 20px; height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
     </style>
 </head>
 <body>
 
     <header>
         <h1>Aether<span>Sync</span></h1>
-        <div class="subtitle">Direct Radio File Tunnel</div>
     </header>
 
-    <div class="container" id="mode-selection">
+    <div class="app-container">
+        
+        <!-- LEFT PANEL: Connection Management -->
         <div class="card">
-            <button class="btn" onclick="initSender()">SEND A FILE</button>
-            <button class="btn outline" onclick="initReceiver()">RECEIVE A FILE</button>
-        </div>
-    </div>
+            <div class="card-title">Network Status</div>
+            
+            <div id="status-display" style="color: var(--primary); font-weight: bold; font-family: monospace;">
+                INITIALIZING...
+            </div>
 
-    <!-- SENDER UI -->
-    <div class="container hidden" id="sender-ui">
-        <div class="card">
-            <h2>Your Warp Code</h2>
-            <div class="id-display" id="my-id">...</div>
-            <p style="color: var(--text-dim); text-align: center; font-size: 0.9rem;">Give this code to the receiver.</p>
-            
-            <div class="status-box" id="sender-status">Initializing network...</div>
-            
-            <button class="btn hidden" id="select-file-btn" onclick="document.getElementById('file-input').click()">SELECT FILE TO SEND</button>
-            <input type="file" id="file-input">
-        </div>
-        <button class="btn outline" onclick="location.reload()">CANCEL</button>
-    </div>
+            <!-- Auto-generated ID Area -->
+            <div id="my-node-area">
+                <div class="card-title" style="margin-top: 10px;">Your Warp Code</div>
+                <div class="id-display" id="my-id">----</div>
+                
+                <div class="link-box">
+                    <input type="text" id="share-link" readonly>
+                    <button class="btn" style="border-radius: 0 8px 8px 0;" onclick="copyLink()">COPY LINK</button>
+                </div>
+            </div>
 
-    <!-- RECEIVER UI -->
-    <div class="container hidden" id="receiver-ui">
-        <div class="card">
-            <h2>Enter Warp Code</h2>
-            <input type="text" id="target-id-input" placeholder="e.g. A7X9" maxlength="4">
-            <button class="btn" id="connect-btn" onclick="connectToSender()">ESTABLISH TUNNEL</button>
-            
-            <div class="status-box hidden" id="receiver-status">Awaiting connection...</div>
+            <hr style="border: 0; border-top: 1px solid var(--border); margin: 10px 0;">
+
+            <!-- Manual Connect Area -->
+            <div id="manual-connect-area">
+                <div class="card-title">Connect to a Node</div>
+                <input type="text" id="target-id" placeholder="ENTER 4-DIGIT CODE" style="width: 100%; padding: 14px; background: #000; border: 1px solid var(--border); color: #fff; border-radius: 8px; text-align: center; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;">
+                <button class="btn" style="width: 100%; margin-top: 10px;" id="connect-btn" onclick="connectToPeer()">ESTABLISH TUNNEL</button>
+            </div>
         </div>
-        <button class="btn outline" onclick="location.reload()">CANCEL</button>
+
+        <!-- RIGHT PANEL: File Transfer Portal -->
+        <div class="card" id="portal-panel" style="opacity: 0.5; pointer-events: none;">
+            <div class="card-title">Transfer Portal</div>
+            
+            <div class="portal" id="dropzone" onclick="document.getElementById('file-input').click()">
+                <div class="portal-icon">🌌</div>
+                <div class="portal-text">Awaiting Connection...</div>
+                <div class="portal-sub">Once connected, tap here or drag & drop multiple files to send.</div>
+                <input type="file" id="file-input" multiple>
+            </div>
+
+            <div class="card-title" style="margin-top: 10px;">Transfer Log</div>
+            <div class="transfer-log" id="transfer-log">
+                <div style="text-align: center; color: var(--text-dim); margin-top: 20px;">No files transferred yet.</div>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // App State
-        let peer = null;
-        let connection = null;
-        const prefix = "aether-"; // Used to make peer IDs unique to this app
+        // ==========================================
+        // APP STATE & CONFIG
+        // ==========================================
+        const PREFIX = "aethersync-";
+        let myPeer = null;
+        let activeConnection = null;
 
-        // Generate a random 4-character alphanumeric code
-        function generateShortID() {
+        // UI Elements
+        const statusDisplay = document.getElementById('status-display');
+        const dropzone = document.getElementById('dropzone');
+        const portalText = document.querySelector('.portal-text');
+        const portalSub = document.querySelector('.portal-sub');
+        const portalPanel = document.getElementById('portal-panel');
+        const fileInput = document.getElementById('file-input');
+        const transferLog = document.getElementById('transfer-log');
+
+        // Generate Random 4-Letter Code
+        function generateCode() {
             return Math.random().toString(36).substring(2, 6).toUpperCase();
         }
 
-        // ==========================================
-        // SENDER LOGIC
-        // ==========================================
-        function initSender() {
-            document.getElementById('mode-selection').classList.add('hidden');
-            document.getElementById('sender-ui').classList.remove('hidden');
-            
-            const shortID = generateShortID();
-            const fullID = prefix + shortID;
-
-            // Initialize PeerJS network
-            peer = new Peer(fullID);
-
-            peer.on('open', (id) => {
-                document.getElementById('my-id').innerText = shortID;
-                document.getElementById('sender-status').innerText = "Waiting for receiver to connect...";
-                document.getElementById('sender-status').style.color = "var(--text-dim)";
-            });
-
-            // When receiver connects to us
-            peer.on('connection', (conn) => {
-                connection = conn;
-                document.getElementById('sender-status').innerText = "Tunnel Established! Ready.";
-                document.getElementById('sender-status').style.color = "var(--success)";
-                document.getElementById('select-file-btn').classList.remove('hidden');
-
-                // Listen for data from receiver (like transfer confirmations)
-                connection.on('data', (data) => {
-                    if(data === 'received') {
-                        document.getElementById('sender-status').innerText = "Transfer Successful!";
-                        setTimeout(() => {
-                            document.getElementById('sender-status').innerText = "Ready for next file.";
-                        }, 3000);
-                    }
-                });
-            });
-
-            peer.on('error', (err) => {
-                document.getElementById('sender-status').innerText = "Network Error: " + err.type;
-                document.getElementById('sender-status').style.color = "var(--accent)";
-            });
+        // Format bytes to human readable
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024, sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
-        // File Selection & Sending
-        document.getElementById('file-input').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file || !connection) return;
+        // ==========================================
+        // INITIALIZATION & ROUTING
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            const shortID = generateCode();
+            const fullID = PREFIX + shortID;
 
-            document.getElementById('sender-status').innerText = `Sending: ${file.name}...`;
-            document.getElementById('sender-status').style.color = "var(--accent)";
-            
-            // WebRTC Data Channels can send JavaScript File/Blob objects natively!
-            // We wrap it in an object to send the filename too.
-            connection.send({
-                file: file,
-                filename: file.name,
-                type: file.type
+            // Initialize PeerJS
+            myPeer = new Peer(fullID);
+
+            myPeer.on('open', (id) => {
+                document.getElementById('my-id').innerText = shortID;
+                statusDisplay.innerText = "ONLINE - READY";
+                statusDisplay.style.color = "var(--success)";
+                
+                // Generate shareable link
+                const baseURL = window.location.href.split('?')[0];
+                const shareURL = `${baseURL}?warp=${shortID}`;
+                document.getElementById('share-link').value = shareURL;
+
+                // Check if user arrived via a share link!
+                const urlParams = new URLSearchParams(window.location.search);
+                const targetWarp = urlParams.get('warp');
+                if (targetWarp) {
+                    document.getElementById('target-id').value = targetWarp.toUpperCase();
+                    connectToPeer(); // Auto-connect
+                }
+            });
+
+            // Listen for incoming connections
+            myPeer.on('connection', (conn) => {
+                handleConnection(conn);
+            });
+
+            myPeer.on('error', (err) => {
+                statusDisplay.innerText = "NETWORK ERROR";
+                statusDisplay.style.color = "#ef4444";
+                console.error(err);
             });
         });
 
+        // ==========================================
+        // CONNECTION HANDLING
+        // ==========================================
+        function connectToPeer() {
+            const code = document.getElementById('target-id').value.toUpperCase();
+            if (code.length < 4) return alert("Enter a valid 4-digit code.");
 
-        // ==========================================
-        // RECEIVER LOGIC
-        // ==========================================
-        function initReceiver() {
-            document.getElementById('mode-selection').classList.add('hidden');
-            document.getElementById('receiver-ui').classList.remove('hidden');
+            statusDisplay.innerText = "PUNCHING TUNNEL...";
+            document.getElementById('connect-btn').innerHTML = '<div class="spinner"></div>';
+            document.getElementById('connect-btn').disabled = true;
+
+            const conn = myPeer.connect(PREFIX + code, { reliable: true });
             
-            // Receiver doesn't strictly need a custom ID, a random one is fine
-            peer = new Peer(); 
+            conn.on('open', () => {
+                handleConnection(conn);
+            });
         }
 
-        function connectToSender() {
-            const inputVal = document.getElementById('target-id-input').value.toUpperCase();
-            if(inputVal.length < 4) return alert("Please enter the 4-character code.");
-
-            const targetID = prefix + inputVal;
+        function handleConnection(conn) {
+            activeConnection = conn;
             
-            document.getElementById('connect-btn').classList.add('hidden');
-            const statusBox = document.getElementById('receiver-status');
-            statusBox.classList.remove('hidden');
-            statusBox.innerText = "Punching tunnel through router...";
-            statusBox.style.color = "var(--text-dim)";
+            // Update UI to Connected State
+            statusDisplay.innerText = "TUNNEL ESTABLISHED";
+            statusDisplay.style.color = "var(--primary)";
+            document.getElementById('connect-btn').innerText = "CONNECTED";
+            document.getElementById('connect-btn').style.background = "var(--success)";
+            
+            portalPanel.style.opacity = "1";
+            portalPanel.style.pointerEvents = "auto";
+            dropzone.classList.add('active');
+            portalText.innerText = "Ready to Transmit";
+            portalSub.innerText = "Tap to select files or drag & drop them here.";
+            
+            // Clear empty log message
+            if (transferLog.innerText.includes("No files")) transferLog.innerHTML = '';
 
-            // Establish Connection
-            connection = peer.connect(targetID, {
-                reliable: true // Ensures packets aren't dropped
+            // Handle incoming data
+            activeConnection.on('data', (data) => {
+                receiveFile(data);
             });
+        }
 
-            connection.on('open', () => {
-                statusBox.innerText = "Tunnel Locked. Awaiting file...";
-                statusBox.style.color = "var(--success)";
-            });
+        // ==========================================
+        // FILE SENDING (Multiple Files)
+        // ==========================================
+        // 1. File Input Click
+        fileInput.addEventListener('change', (e) => {
+            sendFiles(e.target.files);
+            fileInput.value = ''; // Reset input
+        });
 
-            // When a file arrives through the radio tunnel
-            connection.on('data', (data) => {
-                statusBox.innerText = "Receiving payload...";
+        // 2. Drag & Drop Handlers (Desktop)
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                sendFiles(e.dataTransfer.files);
+            }
+        });
+
+        function sendFiles(files) {
+            if (!activeConnection || !activeConnection.open) return alert("Not connected.");
+            
+            Array.from(files).forEach(file => {
+                addLogEntry(file.name, file.size, "out");
                 
-                // data.file is a Blob automatically reconstructed by PeerJS
-                const blob = new Blob([data.file], { type: data.type });
-                
-                // Create a temporary link to download the file natively
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = data.filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-
-                statusBox.innerText = "File Saved: " + data.filename;
-                
-                // Tell the sender we got it
-                connection.send('received');
+                activeConnection.send({
+                    file: file, // Native File object sent directly over radio
+                    filename: file.name,
+                    filetype: file.type,
+                    filesize: file.size
+                });
             });
+        }
 
-            peer.on('error', (err) => {
-                statusBox.innerText = "Connection Failed. Check Code.";
-                statusBox.style.color = "var(--accent)";
-                document.getElementById('connect-btn').classList.remove('hidden');
-            });
+        // ==========================================
+        // FILE RECEIVING
+        // ==========================================
+        function receiveFile(data) {
+            addLogEntry(data.filename, data.filesize, "in");
+
+            // Reconstruct Blob and Download
+            const blob = new Blob([data.file], { type: data.filetype });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+
+        // ==========================================
+        // UTILITIES
+        // ==========================================
+        function addLogEntry(name, size, direction) {
+            const badge = direction === "out" ? `<span class="badge-out">SENT ↗</span>` : `<span class="badge-in">RCVD ↙</span>`;
+            const entry = document.createElement('div');
+            entry.className = 'log-item';
+            entry.innerHTML = `
+                <div class="log-name">${name}</div>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <span class="log-size">${formatBytes(size)}</span>
+                    ${badge}
+                </div>
+            `;
+            transferLog.prepend(entry); // Add to top
+        }
+
+        function copyLink() {
+            const linkInput = document.getElementById('share-link');
+            linkInput.select();
+            document.execCommand('copy');
+            
+            const btn = event.target;
+            btn.innerText = "COPIED!";
+            setTimeout(() => btn.innerText = "COPY LINK", 2000);
         }
     </script>
 </body>
