@@ -3,133 +3,396 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LightStream: QR File Transfer</title>
-    <!-- QR Generator Library -->
+    <title>LightStream: Pro Edition</title>
+    <!-- Dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-    <!-- QR Scanner Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        :root { --bg: #121212; --text: #ffffff; --accent: #00b4d8; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        h1 { margin-bottom: 5px; }
-        .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; width: 100%; max-width: 800px; }
-        .panel { background: #1e1e1e; padding: 20px; border-radius: 12px; flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center; }
-        canvas, img { max-width: 100%; background: white; border-radius: 8px; margin-top: 15px; }
-        button, input[type="file"] { background: var(--accent); color: var(--bg); border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; }
-        button:hover { opacity: 0.9; }
-        #progress-text { margin-top: 10px; font-size: 0.9em; color: #aaa; }
-        #camera-feed { display: none; } /* Hidden, we draw to canvas */
+        /* Modern, Framework-Free Styling */
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #38bdf8;
+            --primary-hover: #0ea5e9;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+            --radius: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Top Navigation */
+        header {
+            text-align: center;
+            padding: 2rem 1rem 1rem;
+        }
+        
+        h1 { font-size: 2rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 0.5rem; }
+        h1 span { color: var(--primary); }
+        
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px auto;
+            background: rgba(255,255,255,0.05);
+            padding: 5px;
+            border-radius: 30px;
+            width: fit-content;
+        }
+
+        .tab-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            padding: 10px 24px;
+            border-radius: 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+        }
+
+        /* Page Layout */
+        .page {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        .page.active { display: flex; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Controls */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+        
+        input[type="range"] { accent-color: var(--primary); }
+
+        .btn {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: center;
+        }
+        
+        .btn:hover { background: var(--primary-hover); }
+        .btn:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+
+        /* Media Displays */
+        .qr-display {
+            width: 100%;
+            aspect-ratio: 1;
+            background: #fff;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #qr-image { width: 100%; height: 100%; object-fit: contain; }
+        
+        video { width: 100%; border-radius: 12px; background: #000; object-fit: cover; }
+        canvas { display: none; } /* Hidden canvas for scanning processing */
+
+        .status-bar {
+            background: rgba(0,0,0,0.2);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .progress-container { width: 100%; background: #334155; border-radius: 8px; height: 8px; overflow: hidden; margin-top: 10px; }
+        .progress-bar { height: 100%; background: var(--success); width: 0%; transition: width 0.1s linear; }
+
+        /* File Input Styling */
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed var(--primary);
+            border-radius: 8px;
+            background: rgba(56, 189, 248, 0.05);
+            color: var(--text);
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
-    <h1>LightStream Transfer</h1>
-    <p>Share files optically via animated QR codes.</p>
+    <header>
+        <h1>Light<span>Stream</span></h1>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('sender')">Send File</button>
+            <button class="tab-btn" onclick="switchTab('receiver')">Receive File</button>
+        </div>
+    </header>
 
-    <div class="container">
-        <!-- SENDER PANEL -->
-        <div class="panel">
-            <h2>Sender</h2>
+    <!-- SENDER PAGE -->
+    <main id="sender" class="page active">
+        <div class="card">
             <input type="file" id="fileInput">
-            <canvas id="qrCanvas" width="300" height="300"></canvas>
-            <div id="sender-status">Waiting for file... (Keep files small!)</div>
-        </div>
+            
+            <div class="control-group">
+                <label>Transfer Speed (<span id="fpsVal">15</span> FPS)</label>
+                <input type="range" id="fpsSlider" min="5" max="30" value="15">
+            </div>
 
-        <!-- RECEIVER PANEL -->
-        <div class="panel">
-            <h2>Receiver</h2>
-            <button id="startRecvBtn">Start Camera</button>
-            <video id="camera-feed" autoplay playsinline></video>
-            <canvas id="scanCanvas" width="300" height="300"></canvas>
-            <div id="receiver-status">Waiting to start...</div>
-            <div id="progress-text"></div>
+            <div class="control-group">
+                <label>QR Density (<span id="densityVal">150</span> chars)</label>
+                <input type="range" id="densitySlider" min="50" max="300" value="150" step="10">
+                <small style="color: var(--text-muted); font-size: 0.75rem;">Higher density is faster but requires a better camera.</small>
+            </div>
+
+            <button id="prepareBtn" class="btn" disabled>Prepare Broadcast</button>
+
+            <div class="qr-display">
+                <img id="qr-image" style="display: none;" alt="QR Code Stream">
+                <div id="sender-status" style="color: black;">Awaiting File...</div>
+            </div>
+            
+            <div class="status-bar" id="broadcast-stats">Ready</div>
         </div>
-    </div>
+    </main>
+
+    <!-- RECEIVER PAGE -->
+    <main id="receiver" class="page">
+        <div class="card">
+            <button id="startRecvBtn" class="btn">Start Camera</button>
+            
+            <video id="camera-feed" autoplay playsinline></video>
+            <canvas id="scanCanvas"></canvas>
+            
+            <div class="status-bar" id="receiver-status">Camera Off</div>
+            
+            <div class="progress-container">
+                <div class="progress-bar" id="recv-progress"></div>
+            </div>
+            <div id="recv-stats" style="text-align: center; margin-top: 5px; font-family: monospace;">0 / 0 Chunks</div>
+        </div>
+    </main>
 
     <script>
-        // --- CONFIGURATION ---
-        // Max chars per QR code. Standard QR can hold ~3000, but they become too dense to scan easily on screens.
-        const CHUNK_SIZE = 150; 
-        const FPS = 10; // Speed of QR switching (100ms per frame)
+        // --- UI LOGIC ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
 
-        // --- SENDER LOGIC ---
-        let qrChunks = [];
-        let currentChunkIndex = 0;
-        let qrInterval;
-        const qrGenerator = new QRious({ element: document.getElementById('qrCanvas'), size: 300, level: 'L' });
-
-        document.getElementById('fileInput').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            document.getElementById('sender-status').innerText = "Processing file...";
-            
-            // 1. Read file as Base64 string
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const base64Data = event.target.result;
-                const fileName = file.name;
-                
-                // 2. Split into chunks
-                qrChunks = [];
-                const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
-                
-                for (let i = 0; i < totalChunks; i++) {
-                    const chunkData = base64Data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-                    // Format: "filename|currentIndex|totalChunks|data"
-                    const payload = `${fileName}|${i}|${totalChunks}|${chunkData}`;
-                    qrChunks.push(payload);
-                }
-
-                document.getElementById('sender-status').innerText = `Broadcasting ${totalChunks} chunks...`;
-                
-                // 3. Start Animation Loop
-                clearInterval(qrInterval);
-                currentChunkIndex = 0;
-                qrInterval = setInterval(() => {
-                    qrGenerator.value = qrChunks[currentChunkIndex];
-                    currentChunkIndex = (currentChunkIndex + 1) % qrChunks.length;
-                }, 1000 / FPS);
-            };
-            reader.readAsDataURL(file); // Reads as base64 string including mime type
+        document.getElementById('fpsSlider').addEventListener('input', (e) => {
+            document.getElementById('fpsVal').innerText = e.target.value;
+            if(broadcastInterval) updateBroadcastSpeed(e.target.value);
         });
 
-        // --- RECEIVER LOGIC ---
+        document.getElementById('densitySlider').addEventListener('input', (e) => {
+            document.getElementById('densityVal').innerText = e.target.value;
+        });
+
+
+        // --- SENDER LOGIC (PRE-RENDER & SHUFFLE) ---
+        let preRenderedQRs = [];
+        let broadcastIndices = [];
+        let broadcastInterval;
+        let currentLoopIndex = 0;
+        let selectedFileBase64 = "";
+        let selectedFileName = "";
+
+        const fileInput = document.getElementById('fileInput');
+        const prepareBtn = document.getElementById('prepareBtn');
+        const qrImage = document.getElementById('qr-image');
+        const senderStatus = document.getElementById('sender-status');
+        const broadcastStats = document.getElementById('broadcast-stats');
+        
+        // Setup hidden QRious instance for pre-rendering
+        const qrGenerator = new QRious({ size: 400, level: 'L' }); // Level L allows more data
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            prepareBtn.disabled = true;
+            senderStatus.innerText = "Reading file...";
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                selectedFileBase64 = event.target.result;
+                selectedFileName = file.name;
+                prepareBtn.disabled = false;
+                senderStatus.innerText = "File loaded. Ready to prepare.";
+            };
+            reader.readAsDataURL(file);
+        });
+
+        prepareBtn.addEventListener('click', async () => {
+            if (!selectedFileBase64) return;
+            
+            prepareBtn.disabled = true;
+            fileInput.disabled = true;
+            qrImage.style.display = "none";
+            senderStatus.style.display = "block";
+            
+            const chunkSize = parseInt(document.getElementById('densitySlider').value);
+            const totalChunks = Math.ceil(selectedFileBase64.length / chunkSize);
+            
+            preRenderedQRs = [];
+            
+            // Allow UI to update before heavy processing
+            for (let i = 0; i < totalChunks; i++) {
+                senderStatus.innerText = `Rendering QR ${i+1}/${totalChunks}...`;
+                await new Promise(r => setTimeout(r, 0)); // Yield to main thread
+                
+                const chunkData = selectedFileBase64.slice(i * chunkSize, (i + 1) * chunkSize);
+                const payload = `${selectedFileName}|${i}|${totalChunks}|${chunkData}`;
+                
+                qrGenerator.value = payload;
+                preRenderedQRs.push(qrGenerator.toDataURL());
+            }
+
+            senderStatus.style.display = "none";
+            qrImage.style.display = "block";
+            
+            startBroadcast();
+        });
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function startBroadcast() {
+            // Create an array of indices to represent our chunks
+            broadcastIndices = Array.from({length: preRenderedQRs.length}, (_, i) => i);
+            currentLoopIndex = 0;
+            
+            updateBroadcastSpeed(document.getElementById('fpsSlider').value);
+        }
+
+        function updateBroadcastSpeed(fps) {
+            clearInterval(broadcastInterval);
+            const intervalMs = 1000 / fps;
+            
+            broadcastInterval = setInterval(() => {
+                if (currentLoopIndex >= broadcastIndices.length) {
+                    // THE MAGIC FIX: Shuffle order on every new loop to prevent missing the same frame
+                    shuffleArray(broadcastIndices);
+                    currentLoopIndex = 0;
+                }
+                
+                const actualChunkIndex = broadcastIndices[currentLoopIndex];
+                qrImage.src = preRenderedQRs[actualChunkIndex];
+                
+                broadcastStats.innerText = `Broadcasting: ${preRenderedQRs.length} Chunks | Loop Frame: ${currentLoopIndex}`;
+                currentLoopIndex++;
+                
+            }, intervalMs);
+        }
+
+
+        // --- RECEIVER LOGIC (OPTIMIZED SCANNING) ---
         const video = document.getElementById('camera-feed');
         const scanCanvas = document.getElementById('scanCanvas');
-        const ctx = scanCanvas.getContext('2d');
-        const statusDiv = document.getElementById('receiver-status');
-        const progressDiv = document.getElementById('progress-text');
+        const ctx = scanCanvas.getContext('2d', { willReadFrequently: true });
+        const recvStatus = document.getElementById('receiver-status');
+        const recvStats = document.getElementById('recv-stats');
+        const progressBar = document.getElementById('recv-progress');
         
-        let receivedData = new Map(); // Store chunks by index
+        let receivedData = new Map();
         let expectedChunks = 0;
         let receivingFileName = "";
         let isReceiving = false;
 
         document.getElementById('startRecvBtn').addEventListener('click', async () => {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                // Request higher resolution for better QR detection
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
+                });
                 video.srcObject = stream;
-                video.style.display = "block";
-                scanCanvas.style.display = "none";
-                statusDiv.innerText = "Scanning for QR stream...";
                 isReceiving = true;
-                requestAnimationFrame(scanVideo);
+                recvStatus.innerText = "Scanning for data stream...";
+                recvStatus.style.color = "var(--primary)";
+                
+                // Wait for video to be ready before scanning
+                video.addEventListener('loadedmetadata', () => {
+                    scanCanvas.width = video.videoWidth;
+                    scanCanvas.height = video.videoHeight;
+                    requestAnimationFrame(scanVideo);
+                });
+
             } catch (err) {
-                statusDiv.innerText = "Error accessing camera: " + err.message;
+                recvStatus.innerText = "Camera Access Denied";
+                recvStatus.style.color = "red";
             }
         });
 
-        function scanVideo() {
+        let lastScanTime = 0;
+        
+        function scanVideo(currentTime) {
             if (!isReceiving) return;
 
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Match canvas to video dimensions
-                scanCanvas.width = video.videoWidth;
-                scanCanvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
+            // Throttle scanning to avoid locking up mobile browsers (e.g. max 30 times a second)
+            if (currentTime - lastScanTime >= 30 && video.readyState === video.HAVE_ENOUGH_DATA) {
+                lastScanTime = currentTime;
                 
+                ctx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
                 const imageData = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+                
+                // jsqr configuration optimized for speed
                 const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
                 if (code) processScannedData(code.data);
@@ -138,18 +401,21 @@
         }
 
         function processScannedData(dataStr) {
-            // Parse: "filename|currentIndex|totalChunks|data"
-            const parts = dataStr.split('|');
-            if (parts.length < 4) return; // Invalid format
+            const splitIndex1 = dataStr.indexOf('|');
+            const splitIndex2 = dataStr.indexOf('|', splitIndex1 + 1);
+            const splitIndex3 = dataStr.indexOf('|', splitIndex2 + 1);
+            
+            if (splitIndex1 === -1 || splitIndex2 === -1 || splitIndex3 === -1) return;
 
-            const fileName = parts[0];
-            const index = parseInt(parts[1]);
-            const total = parseInt(parts[2]);
-            const chunkData = parts.slice(3).join('|'); // Rejoin in case data contains '|'
+            const fileName = dataStr.substring(0, splitIndex1);
+            const index = parseInt(dataStr.substring(splitIndex1 + 1, splitIndex2));
+            const total = parseInt(dataStr.substring(splitIndex2 + 1, splitIndex3));
+            const chunkData = dataStr.substring(splitIndex3 + 1);
 
             if (!receivingFileName) {
                 receivingFileName = fileName;
                 expectedChunks = total;
+                receivedData.clear();
             }
 
             if (!receivedData.has(index)) {
@@ -163,22 +429,26 @@
         }
 
         function updateProgress() {
-            const percent = Math.round((receivedData.size / expectedChunks) * 100);
-            statusDiv.innerText = `Receiving: ${percent}%`;
-            progressDiv.innerText = `${receivedData.size} / ${expectedChunks} chunks`;
+            const percent = (receivedData.size / expectedChunks) * 100;
+            progressBar.style.width = `${percent}%`;
+            recvStats.innerText = `${receivedData.size} / ${expectedChunks} Chunks`;
+            
+            if(receivedData.size > 0 && recvStatus.innerText !== "Receiving Data...") {
+                recvStatus.innerText = "Receiving Data...";
+                recvStatus.style.color = "var(--success)";
+            }
         }
 
         function assembleAndDownload() {
-            isReceiving = false; // Stop scanning
-            statusDiv.innerText = "Transfer Complete! Reassembling...";
+            isReceiving = false;
+            recvStatus.innerText = "Transfer Complete! Reassembling...";
             
-            // Reconstruct base64 string
             let fullBase64 = "";
             for (let i = 0; i < expectedChunks; i++) {
                 fullBase64 += receivedData.get(i);
             }
 
-            // Trigger download
+            // Trigger download via anchor tag
             const a = document.createElement('a');
             a.href = fullBase64;
             a.download = receivingFileName;
@@ -186,15 +456,22 @@
             a.click();
             document.body.removeChild(a);
 
-            statusDiv.innerText = "File downloaded.";
+            recvStatus.innerText = "File successfully saved.";
             
-            // Cleanup
-            receivedData.clear();
-            receivingFileName = "";
-            expectedChunks = 0;
+            // Stop Camera
             const stream = video.srcObject;
-            stream.getTracks().forEach(track => track.stop());
-            video.style.display = "none";
+            if(stream) stream.getTracks().forEach(track => track.stop());
+            
+            // Reset for next file
+            setTimeout(() => {
+                receivedData.clear();
+                receivingFileName = "";
+                expectedChunks = 0;
+                progressBar.style.width = `0%`;
+                recvStats.innerText = `0 / 0 Chunks`;
+                recvStatus.innerText = "Camera Off";
+                recvStatus.style.color = "var(--text)";
+            }, 3000);
         }
     </script>
 </body>
