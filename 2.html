@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LightStream // Optical Data Bridge</title>
+    <!-- Lightweight QR Generator & Fallback Scanner -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        :root {
+            --bg-base: #0a0c10;
+            --bg-panel: #11161f;
+            --bg-hud: #18202c;
+            --border-hud: #243042;
+            --accent-cyan: #00f0ff;
+            --accent-green: #00ff88;
+            --accent-amber: #ffb703;
+            --accent-red: #ff3366;
+            --text-main: #e2e8f0;
+            --text-dim: #708096;
+            --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Top Brand Bar */
+        header {
+            background: rgba(17, 22, 31, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-hud);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: var(--font-mono);
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            font-size: 0.95rem;
+            color: var(--accent-cyan);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* Navigation Mode Switcher */
+        .mode-nav {
+            display: flex;
+            background: var(--bg-base);
+            border-radius: 8px;
+            padding: 3px;
+            border: 1px solid var(--border-hud);
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 6px 16px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .nav-btn.active {
+            background: var(--accent-cyan);
+            color: #000;
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+        }
+
+        /* Main View Container */
+        .app-viewport {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 16px;
+            gap: 16px;
+        }
+
+        /* Desktop Layout (Dashboard Split) */
+        @media (min-width: 900px) {
+            .app-viewport {
+                grid-template-columns: 1fr 1fr;
+                padding: 24px;
+                gap: 24px;
+            }
+            .mode-nav { display: none; } /* Show both panes side by side on desktop */
+            .view-pane { display: flex !important; }
+        }
+
+        /* Mobile Layout */
+        @media (max-width: 899px) {
+            .view-pane { display: none; }
+            .view-pane.active { display: flex; }
+        }
+
+        .view-pane {
+            flex-direction: column;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-hud);
+            border-radius: 12px;
+            padding: 20px;
+            gap: 16px;
+            position: relative;
+        }
+
+        .pane-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-hud);
+            padding-bottom: 10px;
+        }
+
+        .pane-title {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        /* Tactical HUD Grid Matrix */
+        .hud-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            background: var(--bg-base);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-hud);
+        }
+
+        .hud-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .hud-label {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .hud-value {
+            font-family: var(--font-mono);
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+
+        .hud-value.green { color: var(--accent-green); }
+        .hud-value.amber { color: var(--accent-amber); }
+
+        /* Optical Viewports */
+        .viewport-box {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            background: #000;
+            border-radius: 8px;
+            border: 1px solid var(--border-hud);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #qr-canvas-holder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #fff;
+        }
+
+        #qr-image-display {
+            width: 90%;
+            height: 90%;
+            object-fit: contain;
+            image-rendering: pixelated;
+        }
+
+        video#camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Camera Scanner Reticle */
+        .scan-overlay {
+            position: absolute;
+            inset: 15%;
+            border: 2px solid rgba(0, 240, 255, 0.4);
+            border-radius: 8px;
+            pointer-events: none;
+            box-shadow: 0 0 0 4000px rgba(0,0,0,0.55);
+        }
+
+        .scan-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: var(--accent-cyan);
+            box-shadow: 0 0 10px var(--accent-cyan);
+            animation: scanLine 2s linear infinite alternate;
+        }
+
+        @keyframes scanLine {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+
+        /* Control Bars */
+        .controls-box {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .param-slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .param-label {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        input[type="range"] {
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: var(--bg-hud);
+            outline: none;
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 6px var(--accent-cyan);
+        }
+
+        /* Action Buttons */
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .hud-btn {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border-hud);
+            background: var(--bg-hud);
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .hud-btn.primary {
+            background: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+            color: #000;
+        }
+
+        .hud-btn:hover:not(:disabled) {
+            filter: brightness(1.15);
+            border-color: var(--accent-cyan);
+        }
+
+        .hud-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Modern Custom File Picker */
+        .file-dropzone {
+            border: 1px dashed var(--border-hud);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            background: rgba(0, 240, 255, 0.02);
+            transition: border 0.2s;
+        }
+
+        .file-dropzone:hover {
+            border-color: var(--accent-cyan);
+        }
+
+        .file-dropzone-text {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        /* Progress Bar */
+        .progress-rail {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-base);
+            border-radius: 3px;
+            overflow: hidden;
+            border: 1px solid var(--border-hud);
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+            transition: width 0.05s ease-out;
+        }
+
+        /* Hidden Processing Elements */
+        #hidden-canvas { display: none; }
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="status-dot"></div>
+            LIGHTSTREAM // v2.6
+        </div>
+        <div class="mode-nav">
+            <button class="nav-btn active" onclick="setMobileView('tx')">TX (SEND)</button>
+            <button class="nav-btn" onclick="setMobileView('rx')">RX (RECV)</button>
+        </div>
+    </header>
+
+    <div class="app-viewport">
+        <!-- ================= SENDER PANE (TX) ================= -->
+        <div class="view-pane active" id="pane-tx">
+            <div class="pane-header">
+                <span class="pane-title">TRANSMITTER COCKPIT</span>
+                <span id="tx-status-badge" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-amber);">IDLE</span>
+            </div>
+
+            <!-- Sender Telemetry HUD -->
+            <div class="hud-grid">
+                <div class="hud-cell">
+                    <span class="hud-label">TX RATE</span>
+                    <span class="hud-value" id="tx-fps-readout">24 FPS</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">DENSITY</span>
+                    <span class="hud-value" id="tx-density-readout">250 B</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">PAYLOAD</span>
+                    <span class="hud-value" id="tx-payload-readout">0 KB</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">TOTAL BLOCKS</span>
+                    <span class="hud-value" id="tx-total-blocks">0</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">ACTIVE BLOCK</span>
+                    <span class="hud-value green" id="tx-active-block">--</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">EST. TIME</span>
+                    <span class="hud-value" id="tx-est-time">0.0s</span>
+                </div>
+            </div>
+
+            <!-- Optical Display -->
+            <div class="viewport-box">
+                <div id="qr-canvas-holder">
+                    <img id="qr-image-display" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100%' height='100%' fill='%23fff'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='monospace' font-size='10' fill='%23aaa'>AWAITING FILE</text></svg>" alt="Optical Payload">
+                </div>
+            </div>
+
+            <!-- Transmitter Controls -->
+            <div class="controls-box">
+                <div class="file-dropzone" onclick="document.getElementById('txFileInput').click()">
+                    <span class="file-dropzone-text" id="tx-file-label">SELECT OR DROP PAYLOAD FILE</span>
+                    <input type="file" id="txFileInput">
+                </div>
+
+                <div class="param-slider-group">
+                    <div class="param-label">
+                        <span>TRANSMIT SPEED</span>
+                        <span id="slider-fps-label">24 FPS</span>
+                    </div>
+                    <input type="range" id="txFpsSlider" min="5" max="60" value="24">
+                </div>
+
+                <div class="param-slider-group">
+                    <div class="param-label">
+                        <span>QR DENSITY (BYTES/BLOCK)</span>
+                        <span id="slider-density-label">250 BYTES</span>
+                    </div>
+                    <input type="range" id="txDensitySlider" min="80" max="600" step="20" value="250">
+                </div>
+
+                <button class="hud-btn primary" id="txStartBtn" disabled>START BROADCAST</button>
+            </div>
+        </div>
+
+        <!-- ================= RECEIVER PANE (RX) ================= -->
+        <div class="view-pane" id="pane-rx">
+            <div class="pane-header">
+                <span class="pane-title">RECEIVER TELEMETRY</span>
+                <span id="rx-status-badge" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-amber);">OFFLINE</span>
+            </div>
+
+            <!-- Receiver HUD Grid -->
+            <div class="hud-grid">
+                <div class="hud-cell">
+                    <span class="hud-label">DECODE FPS</span>
+                    <span class="hud-value green" id="rx-fps-readout">0.0</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">THROUGHPUT</span>
+                    <span class="hud-value" id="rx-throughput-readout">0.0 KB/s</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">ELAPSED</span>
+                    <span class="hud-value" id="rx-elapsed-readout">0.0s</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">BLOCKS RCV</span>
+                    <span class="hud-value green" id="rx-blocks-readout">0 / 0</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">MISSING</span>
+                    <span class="hud-value amber" id="rx-missing-readout">0</span>
+                </div>
+                <div class="hud-cell">
+                    <span class="hud-label">ENGINE</span>
+                    <span class="hud-value" id="rx-engine-readout">INIT</span>
+                </div>
+            </div>
+
+            <!-- Camera Viewport with Reticle -->
+            <div class="viewport-box">
+                <video id="camera-feed" autoplay playsinline muted></video>
+                <div class="scan-overlay" id="scanReticle" style="display: none;"></div>
+            </div>
+
+            <!-- Progress Rail -->
+            <div class="progress-rail">
+                <div class="progress-fill" id="rx-progress-bar"></div>
+            </div>
+
+            <!-- Receiver Controls -->
+            <div class="controls-box">
+                <div class="btn-group">
+                    <button class="hud-btn primary" id="rxPowerBtn">ENGAGE CAMERA</button>
+                    <button class="hud-btn" id="rxTorchBtn" disabled>TORCH</button>
+                </div>
+                <div class="btn-group">
+                    <button class="hud-btn" id="rxSwitchCamBtn" disabled>SWITCH CAM</button>
+                    <button class="hud-btn" id="rxResetBtn">RESET</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Processing Canvas -->
+    <canvas id="hidden-canvas"></canvas>
+
+    <script>
+        /* ==========================================================================
+           GLOBAL & UI NAVIGATION
+           ========================================================================== */
+        function setMobileView(view) {
+            document.querySelectorAll('.view-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            if (view === 'tx') {
+                document.getElementById('pane-tx').classList.add('active');
+                event.target.classList.add('active');
+            } else {
+                document.getElementById('pane-rx').classList.add('active');
+                event.target.classList.add('active');
+            }
+        }
+
+        /* ==========================================================================
+           TRANSMITTER ENGINE (PRE-RENDERED FRAME CYCLING)
+           ========================================================================== */
+        const txFileInput = document.getElementById('txFileInput');
+        const txFileLabel = document.getElementById('tx-file-label');
+        const txStartBtn = document.getElementById('txStartBtn');
+        const txFpsSlider = document.getElementById('txFpsSlider');
+        const txDensitySlider = document.getElementById('txDensitySlider');
+        const txQrImage = document.getElementById('qr-image-display');
+        
+        let txRawBase64 = "";
+        let txFileName = "";
+        let txPreRenderedFrames = [];
+        let txShuffledOrder = [];
+        let txCycleInterval = null;
+        let txFrameIndex = 0;
+        let isBroadcasting = false;
+
+        const qrGen = new QRious({ size: 480, level: 'L' }); // Error correction 'L' maximizes density
+
+        txFpsSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('slider-fps-label').innerText = `${val} FPS`;
+            document.getElementById('tx-fps-readout').innerText = `${val} FPS`;
+            if (isBroadcasting) restartBroadcastLoop(parseInt(val));
+        });
+
+        txDensitySlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('slider-density-label').innerText = `${val} BYTES`;
+            document.getElementById('tx-density-readout').innerText = `${val} B`;
+            if (txRawBase64) preparePayload();
+        });
+
+        txFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            txFileName = file.name;
+            txFileLabel.innerText = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+            document.getElementById('tx-payload-readout').innerText = `${(file.size / 1024).toFixed(1)} KB`;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                txRawBase64 = event.target.result;
+                preparePayload();
+            };
+            reader.readAsDataURL(file);
+        });
+
+        async function preparePayload() {
+            txStartBtn.disabled = true;
+            document.getElementById('tx-status-badge').innerText = "RENDERING...";
+            document.getElementById('tx-status-badge').style.color = "var(--accent-cyan)";
+
+            const chunkSize = parseInt(txDensitySlider.value);
+            const totalChunks = Math.ceil(txRawBase64.length / chunkSize);
+            document.getElementById('tx-total-blocks').innerText = totalChunks;
+
+            const estTimeSec = (totalChunks / parseInt(txFpsSlider.value)).toFixed(1);
+            document.getElementById('tx-est-time').innerText = `${estTimeSec}s`;
+
+            txPreRenderedFrames = [];
+            
+            // Non-blocking pre-render loop
+            for (let i = 0; i < totalChunks; i++) {
+                const slice = txRawBase64.slice(i * chunkSize, (i + 1) * chunkSize);
+                // Header Protocol: "name|index|total|data"
+                const packet = `${txFileName}|${i}|${totalChunks}|${slice}`;
+                qrGen.value = packet;
+                txPreRenderedFrames.push(qrGen.toDataURL());
+
+                if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
+            }
+
+            document.getElementById('tx-status-badge').innerText = "READY";
+            document.getElementById('tx-status-badge').style.color = "var(--accent-green)";
+            txStartBtn.disabled = false;
+            txStartBtn.innerText = "START BROADCAST";
+        }
+
+        txStartBtn.addEventListener('click', () => {
+            if (isBroadcasting) {
+                stopBroadcast();
+            } else {
+                startBroadcast();
+            }
+        });
+
+        function startBroadcast() {
+            isBroadcasting = true;
+            txStartBtn.innerText = "HALT BROADCAST";
+            txStartBtn.classList.replace('primary', 'hud-btn');
+            document.getElementById('tx-status-badge').innerText = "STREAMING";
+            document.getElementById('tx-status-badge').style.color = "var(--accent-cyan)";
+
+            txShuffledOrder = Array.from({ length: txPreRenderedFrames.length }, (_, i) => i);
+            txFrameIndex = 0;
+            restartBroadcastLoop(parseInt(txFpsSlider.value));
+        }
+
+        function stopBroadcast() {
+            isBroadcasting = false;
+            clearInterval(txCycleInterval);
+            txStartBtn.innerText = "RESUME BROADCAST";
+            txStartBtn.classList.replace('hud-btn', 'primary');
+            document.getElementById('tx-status-badge').innerText = "PAUSED";
+            document.getElementById('tx-status-badge').style.color = "var(--accent-amber)";
+        }
+
+        function restartBroadcastLoop(fps) {
+            clearInterval(txCycleInterval);
+            const intervalMs = 1000 / fps;
+
+            txCycleInterval = setInterval(() => {
+                if (txFrameIndex >= txShuffledOrder.length) {
+                    // Modern Fisher-Yates shuffle prevents drop resonance
+                    for (let i = txShuffledOrder.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [txShuffledOrder[i], txShuffledOrder[j]] = [txShuffledOrder[j], txShuffledOrder[i]];
+                    }
+                    txFrameIndex = 0;
+                }
+
+                const frame = txShuffledOrder[txFrameIndex];
+                txQrImage.src = txPreRenderedFrames[frame];
+                document.getElementById('tx-active-block').innerText = `${frame + 1}`;
+                txFrameIndex++;
+            }, intervalMs);
+        }
+
+        /* ==========================================================================
+           RECEIVER ENGINE (HARDWARE-ACCELERATED COMPUTER VISION)
+           ========================================================================== */
+        const video = document.getElementById('camera-feed');
+        const scanReticle = document.getElementById('scanReticle');
+        const hiddenCanvas = document.getElementById('hidden-canvas');
+        const ctx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
+        
+        const rxPowerBtn = document.getElementById('rxPowerBtn');
+        const rxTorchBtn = document.getElementById('rxTorchBtn');
+        const rxSwitchCamBtn = document.getElementById('rxSwitchCamBtn');
+        const rxResetBtn = document.getElementById('rxResetBtn');
+        
+        let rxStream = null;
+        let rxVideoTrack = null;
+        let isReceiving = false;
+        let currentFacingMode = "environment";
+        let isTorchOn = false;
+
+        // Telemetry Data
+        let rxReceivedBlocks = new Map();
+        let rxTotalBlocks = 0;
+        let rxFileName = "";
+        let rxStartTime = null;
+        let rxDecodedFramesCounter = 0;
+        let rxLastFrameCalcTime = performance.now();
+        let rxTotalBytesCount = 0;
+
+        // Native Barcode Detector Check
+        const useNativeDetector = ('BarcodeDetector' in window);
+        let barcodeDetector = null;
+
+        if (useNativeDetector) {
+            document.getElementById('rx-engine-readout').innerText = "HW-ACCEL";
+            barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+        } else {
+            document.getElementById('rx-engine-readout').innerText = "JS-SW";
+        }
+
+        rxPowerBtn.addEventListener('click', async () => {
+            if (isReceiving) {
+                shutdownReceiver();
+            } else {
+                initReceiver();
+            }
+        });
+
+        async function initReceiver() {
+            try {
+                // Hardware constraint optimization: Auto Focus + HD Resolution
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: currentFacingMode },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        focusMode: { ideal: "continuous" }
+                    }
+                };
+
+                rxStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = rxStream;
+                rxVideoTrack = rxStream.getVideoTracks()[0];
+
+                // Check Torch Capability
+                const capabilities = rxVideoTrack.getCapabilities ? rxVideoTrack.getCapabilities() : {};
+                rxTorchBtn.disabled = !capabilities.torch;
+                rxSwitchCamBtn.disabled = false;
+
+                await video.play();
+                isReceiving = true;
+                scanReticle.style.display = "block";
+                rxPowerBtn.innerText = "STOP CAMERA";
+                rxPowerBtn.classList.replace('primary', 'hud-btn');
+                document.getElementById('rx-status-badge').innerText = "SEARCHING";
+                document.getElementById('rx-status-badge').style.color = "var(--accent-cyan)";
+
+                hiddenCanvas.width = video.videoWidth || 640;
+                hiddenCanvas.height = video.videoHeight || 480;
+
+                requestAnimationFrame(scanTelemetryFrame);
+            } catch (err) {
+                alert("Camera Initialization Failed: " + err.message);
+            }
+        }
+
+        function shutdownReceiver() {
+            isReceiving = false;
+            if (rxStream) {
+                rxStream.getTracks().forEach(t => t.stop());
+                rxStream = null;
+            }
+            scanReticle.style.display = "none";
+            rxPowerBtn.innerText = "ENGAGE CAMERA";
+            rxPowerBtn.classList.replace('hud-btn', 'primary');
+            rxTorchBtn.disabled = true;
+            rxSwitchCamBtn.disabled = true;
+            document.getElementById('rx-status-badge').innerText = "OFFLINE";
+            document.getElementById('rx-status-badge').style.color = "var(--accent-amber)";
+        }
+
+        // Hardware Torch Toggle
+        rxTorchBtn.addEventListener('click', async () => {
+            if (!rxVideoTrack) return;
+            try {
+                isTorchOn = !isTorchOn;
+                await rxVideoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] });
+                rxTorchBtn.style.color = isTorchOn ? "var(--accent-green)" : "var(--text-main)";
+            } catch (e) {
+                console.warn("Torch failed", e);
+            }
+        });
+
+        // Switch Camera Front/Back
+        rxSwitchCamBtn.addEventListener('click', async () => {
+            currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+            shutdownReceiver();
+            await initReceiver();
+        });
+
+        rxResetBtn.addEventListener('click', resetRxTelemetry);
+
+        function resetRxTelemetry() {
+            rxReceivedBlocks.clear();
+            rxTotalBlocks = 0;
+            rxFileName = "";
+            rxStartTime = null;
+            rxDecodedFramesCounter = 0;
+            rxTotalBytesCount = 0;
+            document.getElementById('rx-progress-bar').style.width = "0%";
+            document.getElementById('rx-blocks-readout').innerText = "0 / 0";
+            document.getElementById('rx-missing-readout').innerText = "0";
+            document.getElementById('rx-fps-readout').innerText = "0.0";
+            document.getElementById('rx-throughput-readout').innerText = "0.0 KB/s";
+            document.getElementById('rx-elapsed-readout').innerText = "0.0s";
+            document.getElementById('rx-status-badge').innerText = isReceiving ? "SEARCHING" : "OFFLINE";
+        }
+
+        /* Continuous Vision Loop */
+        async function scanTelemetryFrame(timestamp) {
+            if (!isReceiving) return;
+
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                let detectedData = null;
+
+                // Priority Path: Hardware Accelerated Detector
+                if (useNativeDetector) {
+                    try {
+                        const barcodes = await barcodeDetector.detect(video);
+                        if (barcodes.length > 0) detectedData = barcodes[0].rawValue;
+                    } catch (e) {
+                        // Fallback in case of hardware glitch
+                    }
+                }
+
+                // Fallback Path: Software JS Canvas Rasterizer
+                if (!detectedData) {
+                    if (hiddenCanvas.width !== video.videoWidth) {
+                        hiddenCanvas.width = video.videoWidth;
+                        hiddenCanvas.height = video.videoHeight;
+                    }
+                    ctx.drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+                    const imgData = ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height);
+                    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "dontInvert" });
+                    if (code) detectedData = code.data;
+                }
+
+                if (detectedData) ingestPacket(detectedData);
+
+                // Telemetry Calculation (1-second tick)
+                rxDecodedFramesCounter++;
+                if (timestamp - rxLastFrameCalcTime >= 500) {
+                    const elapsedSec = (timestamp - rxLastFrameCalcTime) / 1000;
+                    const fps = (rxDecodedFramesCounter / elapsedSec).toFixed(1);
+                    document.getElementById('rx-fps-readout').innerText = fps;
+
+                    if (rxStartTime) {
+                        const totalElapsed = ((timestamp - rxStartTime) / 1000).toFixed(1);
+                        document.getElementById('rx-elapsed-readout').innerText = `${totalElapsed}s`;
+                        
+                        const throughput = ((rxTotalBytesCount / 1024) / totalElapsed).toFixed(1);
+                        document.getElementById('rx-throughput-readout').innerText = `${throughput} KB/s`;
+                    }
+
+                    rxDecodedFramesCounter = 0;
+                    rxLastFrameCalcTime = timestamp;
+                }
+            }
+
+            requestAnimationFrame(scanTelemetryFrame);
+        }
+
+        function ingestPacket(rawPacket) {
+            const p1 = rawPacket.indexOf('|');
+            const p2 = rawPacket.indexOf('|', p1 + 1);
+            const p3 = rawPacket.indexOf('|', p2 + 1);
+
+            if (p1 === -1 || p2 === -1 || p3 === -1) return;
+
+            const fileName = rawPacket.substring(0, p1);
+            const index = parseInt(rawPacket.substring(p1 + 1, p2));
+            const total = parseInt(rawPacket.substring(p2 + 1, p3));
+            const chunkData = rawPacket.substring(p3 + 1);
+
+            if (!rxStartTime) rxStartTime = performance.now();
+
+            if (rxFileName !== fileName || rxTotalBlocks !== total) {
+                rxFileName = fileName;
+                rxTotalBlocks = total;
+                rxReceivedBlocks.clear();
+                rxTotalBytesCount = 0;
+            }
+
+            if (!rxReceivedBlocks.has(index)) {
+                rxReceivedBlocks.set(index, chunkData);
+                rxTotalBytesCount += chunkData.length;
+
+                // Update HUD
+                const rcvCount = rxReceivedBlocks.size;
+                const missing = rxTotalBlocks - rcvCount;
+                const percent = (rcvCount / rxTotalBlocks) * 100;
+
+                document.getElementById('rx-progress-bar').style.width = `${percent}%`;
+                document.getElementById('rx-blocks-readout').innerText = `${rcvCount} / ${rxTotalBlocks}`;
+                document.getElementById('rx-missing-readout').innerText = missing;
+                document.getElementById('rx-status-badge').innerText = "INGESTING";
+                document.getElementById('rx-status-badge').style.color = "var(--accent-green)";
+
+                if (rcvCount === rxTotalBlocks && rxTotalBlocks > 0) {
+                    completeReconstruction();
+                }
+            }
+        }
+
+        function completeReconstruction() {
+            document.getElementById('rx-status-badge').innerText = "SUCCESS";
+            document.getElementById('rx-status-badge').style.color = "var(--accent-green)";
+
+            let fullPayloadBase64 = "";
+            for (let i = 0; i < rxTotalBlocks; i++) {
+                fullPayloadBase64 += rxReceivedBlocks.get(i);
+            }
+
+            // Trigger Automatic File Stream Download
+            const dlAnchor = document.createElement('a');
+            dlAnchor.href = fullPayloadBase64;
+            dlAnchor.download = rxFileName;
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            document.body.removeChild(dlAnchor);
+        }
+    </script>
+</body>
+</html>
