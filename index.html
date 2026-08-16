@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LightStream: QR File Transfer</title>
+    <!-- QR Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <!-- QR Scanner Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        :root { --bg: #121212; --text: #ffffff; --accent: #00b4d8; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        h1 { margin-bottom: 5px; }
+        .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; width: 100%; max-width: 800px; }
+        .panel { background: #1e1e1e; padding: 20px; border-radius: 12px; flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center; }
+        canvas, img { max-width: 100%; background: white; border-radius: 8px; margin-top: 15px; }
+        button, input[type="file"] { background: var(--accent); color: var(--bg); border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; }
+        button:hover { opacity: 0.9; }
+        #progress-text { margin-top: 10px; font-size: 0.9em; color: #aaa; }
+        #camera-feed { display: none; } /* Hidden, we draw to canvas */
+    </style>
+</head>
+<body>
+
+    <h1>LightStream Transfer</h1>
+    <p>Share files optically via animated QR codes.</p>
+
+    <div class="container">
+        <!-- SENDER PANEL -->
+        <div class="panel">
+            <h2>Sender</h2>
+            <input type="file" id="fileInput">
+            <canvas id="qrCanvas" width="300" height="300"></canvas>
+            <div id="sender-status">Waiting for file... (Keep files small!)</div>
+        </div>
+
+        <!-- RECEIVER PANEL -->
+        <div class="panel">
+            <h2>Receiver</h2>
+            <button id="startRecvBtn">Start Camera</button>
+            <video id="camera-feed" autoplay playsinline></video>
+            <canvas id="scanCanvas" width="300" height="300"></canvas>
+            <div id="receiver-status">Waiting to start...</div>
+            <div id="progress-text"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        // Max chars per QR code. Standard QR can hold ~3000, but they become too dense to scan easily on screens.
+        const CHUNK_SIZE = 150; 
+        const FPS = 10; // Speed of QR switching (100ms per frame)
+
+        // --- SENDER LOGIC ---
+        let qrChunks = [];
+        let currentChunkIndex = 0;
+        let qrInterval;
+        const qrGenerator = new QRious({ element: document.getElementById('qrCanvas'), size: 300, level: 'L' });
+
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('sender-status').innerText = "Processing file...";
+            
+            // 1. Read file as Base64 string
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64Data = event.target.result;
+                const fileName = file.name;
+                
+                // 2. Split into chunks
+                qrChunks = [];
+                const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
+                
+                for (let i = 0; i < totalChunks; i++) {
+                    const chunkData = base64Data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+                    // Format: "filename|currentIndex|totalChunks|data"
+                    const payload = `${fileName}|${i}|${totalChunks}|${chunkData}`;
+                    qrChunks.push(payload);
+                }
+
+                document.getElementById('sender-status').innerText = `Broadcasting ${totalChunks} chunks...`;
+                
+                // 3. Start Animation Loop
+                clearInterval(qrInterval);
+                currentChunkIndex = 0;
+                qrInterval = setInterval(() => {
+                    qrGenerator.value = qrChunks[currentChunkIndex];
+                    currentChunkIndex = (currentChunkIndex + 1) % qrChunks.length;
+                }, 1000 / FPS);
+            };
+            reader.readAsDataURL(file); // Reads as base64 string including mime type
+        });
+
+        // --- RECEIVER LOGIC ---
+        const video = document.getElementById('camera-feed');
+        const scanCanvas = document.getElementById('scanCanvas');
+        const ctx = scanCanvas.getContext('2d');
+        const statusDiv = document.getElementById('receiver-status');
+        const progressDiv = document.getElementById('progress-text');
+        
+        let receivedData = new Map(); // Store chunks by index
+        let expectedChunks = 0;
+        let receivingFileName = "";
+        let isReceiving = false;
+
+        document.getElementById('startRecvBtn').addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+                video.style.display = "block";
+                scanCanvas.style.display = "none";
+                statusDiv.innerText = "Scanning for QR stream...";
+                isReceiving = true;
+                requestAnimationFrame(scanVideo);
+            } catch (err) {
+                statusDiv.innerText = "Error accessing camera: " + err.message;
+            }
+        });
+
+        function scanVideo() {
+            if (!isReceiving) return;
+
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Match canvas to video dimensions
+                scanCanvas.width = video.videoWidth;
+                scanCanvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
+                
+                const imageData = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+                if (code) processScannedData(code.data);
+            }
+            requestAnimationFrame(scanVideo);
+        }
+
+        function processScannedData(dataStr) {
+            // Parse: "filename|currentIndex|totalChunks|data"
+            const parts = dataStr.split('|');
+            if (parts.length < 4) return; // Invalid format
+
+            const fileName = parts[0];
+            const index = parseInt(parts[1]);
+            const total = parseInt(parts[2]);
+            const chunkData = parts.slice(3).join('|'); // Rejoin in case data contains '|'
+
+            if (!receivingFileName) {
+                receivingFileName = fileName;
+                expectedChunks = total;
+            }
+
+            if (!receivedData.has(index)) {
+                receivedData.set(index, chunkData);
+                updateProgress();
+            }
+
+            if (receivedData.size === expectedChunks && expectedChunks > 0) {
+                assembleAndDownload();
+            }
+        }
+
+        function updateProgress() {
+            const percent = Math.round((receivedData.size / expectedChunks) * 100);
+            statusDiv.innerText = `Receiving: ${percent}%`;
+            progressDiv.innerText = `${receivedData.size} / ${expectedChunks} chunks`;
+        }
+
+        function assembleAndDownload() {
+            isReceiving = false; // Stop scanning
+            statusDiv.innerText = "Transfer Complete! Reassembling...";
+            
+            // Reconstruct base64 string
+            let fullBase64 = "";
+            for (let i = 0; i < expectedChunks; i++) {
+                fullBase64 += receivedData.get(i);
+            }
+
+            // Trigger download
+            const a = document.createElement('a');
+            a.href = fullBase64;
+            a.download = receivingFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            statusDiv.innerText = "File downloaded.";
+            
+            // Cleanup
+            receivedData.clear();
+            receivingFileName = "";
+            expectedChunks = 0;
+            const stream = video.srcObject;
+            stream.getTracks().forEach(track => track.stop());
+            video.style.display = "none";
+        }
+    </script>
+</body>
+</html>
