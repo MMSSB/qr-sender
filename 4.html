@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AetherSync // P2P Radio Tunnel</title>
+    
+    <!-- PeerJS: Lightweight WebRTC Wrapper -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    
+    <style>
+        :root {
+            --bg: #050505;
+            --surface: #121212;
+            --border: #2a2a2a;
+            --accent: #ff3366;
+            --accent-hover: #ff0040;
+            --success: #00ff88;
+            --text-main: #ffffff;
+            --text-dim: #888888;
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font);
+            background-color: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            margin-top: 20px;
+        }
+
+        h1 {
+            font-weight: 900;
+            letter-spacing: -1px;
+            font-size: 2rem;
+        }
+
+        h1 span { color: var(--accent); }
+        
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Subtle glow effect */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.5;
+        }
+
+        h2 { font-size: 1.1rem; color: var(--text-dim); margin-bottom: 5px; }
+
+        .btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            width: 100%;
+        }
+
+        .btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
+        .btn:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
+
+        .btn.outline {
+            background: transparent;
+            border: 2px solid var(--border);
+            color: var(--text-main);
+        }
+        .btn.outline:hover { border-color: var(--accent); }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 16px;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1.2rem;
+            text-align: center;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        input[type="text"]:focus { border-color: var(--accent); }
+        input[type="file"] { display: none; }
+
+        .status-box {
+            background: #000;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--success);
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .id-display {
+            font-size: 2.5rem;
+            font-weight: 900;
+            text-align: center;
+            letter-spacing: 4px;
+            color: var(--accent);
+            margin: 10px 0;
+            user-select: all;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Aether<span>Sync</span></h1>
+        <div class="subtitle">Direct Radio File Tunnel</div>
+    </header>
+
+    <div class="container" id="mode-selection">
+        <div class="card">
+            <button class="btn" onclick="initSender()">SEND A FILE</button>
+            <button class="btn outline" onclick="initReceiver()">RECEIVE A FILE</button>
+        </div>
+    </div>
+
+    <!-- SENDER UI -->
+    <div class="container hidden" id="sender-ui">
+        <div class="card">
+            <h2>Your Warp Code</h2>
+            <div class="id-display" id="my-id">...</div>
+            <p style="color: var(--text-dim); text-align: center; font-size: 0.9rem;">Give this code to the receiver.</p>
+            
+            <div class="status-box" id="sender-status">Initializing network...</div>
+            
+            <button class="btn hidden" id="select-file-btn" onclick="document.getElementById('file-input').click()">SELECT FILE TO SEND</button>
+            <input type="file" id="file-input">
+        </div>
+        <button class="btn outline" onclick="location.reload()">CANCEL</button>
+    </div>
+
+    <!-- RECEIVER UI -->
+    <div class="container hidden" id="receiver-ui">
+        <div class="card">
+            <h2>Enter Warp Code</h2>
+            <input type="text" id="target-id-input" placeholder="e.g. A7X9" maxlength="4">
+            <button class="btn" id="connect-btn" onclick="connectToSender()">ESTABLISH TUNNEL</button>
+            
+            <div class="status-box hidden" id="receiver-status">Awaiting connection...</div>
+        </div>
+        <button class="btn outline" onclick="location.reload()">CANCEL</button>
+    </div>
+
+    <script>
+        // App State
+        let peer = null;
+        let connection = null;
+        const prefix = "aether-"; // Used to make peer IDs unique to this app
+
+        // Generate a random 4-character alphanumeric code
+        function generateShortID() {
+            return Math.random().toString(36).substring(2, 6).toUpperCase();
+        }
+
+        // ==========================================
+        // SENDER LOGIC
+        // ==========================================
+        function initSender() {
+            document.getElementById('mode-selection').classList.add('hidden');
+            document.getElementById('sender-ui').classList.remove('hidden');
+            
+            const shortID = generateShortID();
+            const fullID = prefix + shortID;
+
+            // Initialize PeerJS network
+            peer = new Peer(fullID);
+
+            peer.on('open', (id) => {
+                document.getElementById('my-id').innerText = shortID;
+                document.getElementById('sender-status').innerText = "Waiting for receiver to connect...";
+                document.getElementById('sender-status').style.color = "var(--text-dim)";
+            });
+
+            // When receiver connects to us
+            peer.on('connection', (conn) => {
+                connection = conn;
+                document.getElementById('sender-status').innerText = "Tunnel Established! Ready.";
+                document.getElementById('sender-status').style.color = "var(--success)";
+                document.getElementById('select-file-btn').classList.remove('hidden');
+
+                // Listen for data from receiver (like transfer confirmations)
+                connection.on('data', (data) => {
+                    if(data === 'received') {
+                        document.getElementById('sender-status').innerText = "Transfer Successful!";
+                        setTimeout(() => {
+                            document.getElementById('sender-status').innerText = "Ready for next file.";
+                        }, 3000);
+                    }
+                });
+            });
+
+            peer.on('error', (err) => {
+                document.getElementById('sender-status').innerText = "Network Error: " + err.type;
+                document.getElementById('sender-status').style.color = "var(--accent)";
+            });
+        }
+
+        // File Selection & Sending
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file || !connection) return;
+
+            document.getElementById('sender-status').innerText = `Sending: ${file.name}...`;
+            document.getElementById('sender-status').style.color = "var(--accent)";
+            
+            // WebRTC Data Channels can send JavaScript File/Blob objects natively!
+            // We wrap it in an object to send the filename too.
+            connection.send({
+                file: file,
+                filename: file.name,
+                type: file.type
+            });
+        });
+
+
+        // ==========================================
+        // RECEIVER LOGIC
+        // ==========================================
+        function initReceiver() {
+            document.getElementById('mode-selection').classList.add('hidden');
+            document.getElementById('receiver-ui').classList.remove('hidden');
+            
+            // Receiver doesn't strictly need a custom ID, a random one is fine
+            peer = new Peer(); 
+        }
+
+        function connectToSender() {
+            const inputVal = document.getElementById('target-id-input').value.toUpperCase();
+            if(inputVal.length < 4) return alert("Please enter the 4-character code.");
+
+            const targetID = prefix + inputVal;
+            
+            document.getElementById('connect-btn').classList.add('hidden');
+            const statusBox = document.getElementById('receiver-status');
+            statusBox.classList.remove('hidden');
+            statusBox.innerText = "Punching tunnel through router...";
+            statusBox.style.color = "var(--text-dim)";
+
+            // Establish Connection
+            connection = peer.connect(targetID, {
+                reliable: true // Ensures packets aren't dropped
+            });
+
+            connection.on('open', () => {
+                statusBox.innerText = "Tunnel Locked. Awaiting file...";
+                statusBox.style.color = "var(--success)";
+            });
+
+            // When a file arrives through the radio tunnel
+            connection.on('data', (data) => {
+                statusBox.innerText = "Receiving payload...";
+                
+                // data.file is a Blob automatically reconstructed by PeerJS
+                const blob = new Blob([data.file], { type: data.type });
+                
+                // Create a temporary link to download the file natively
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                statusBox.innerText = "File Saved: " + data.filename;
+                
+                // Tell the sender we got it
+                connection.send('received');
+            });
+
+            peer.on('error', (err) => {
+                statusBox.innerText = "Connection Failed. Check Code.";
+                statusBox.style.color = "var(--accent)";
+                document.getElementById('connect-btn').classList.remove('hidden');
+            });
+        }
+    </script>
+</body>
+</html>
